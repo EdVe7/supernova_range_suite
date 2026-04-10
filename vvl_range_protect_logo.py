@@ -1,6 +1,7 @@
 import datetime
 import time
 
+import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -323,6 +324,14 @@ with tab_review:
         if df_f.empty:
             st.warning("Nessun dato nel filtro selezionato.")
         else:
+            df_f = df_f.copy()
+            df_f["DateTime"] = pd.to_datetime(
+                df_f["Date"].astype(str) + " " + df_f["Time"].astype(str),
+                errors="coerce",
+            )
+            df_f["Lateral_Error"] = df_f.apply(calc_lateral, axis=1)
+            df_f["ShotSeq"] = np.arange(1, len(df_f) + 1)
+
             kpi = compute_kpis(df_f)
             k1, k2, k3, k4, k5 = st.columns(5)
             k1.metric("Shot Totali", f"{kpi['shots']}")
@@ -354,11 +363,49 @@ with tab_review:
                 )
                 st.plotly_chart(fig_curv, use_container_width=True)
 
+            g3, g4 = st.columns(2)
+            with g3:
+                rating_mix = (
+                    df_f["Rating"]
+                    .value_counts(dropna=True)
+                    .rename_axis("Rating")
+                    .reset_index(name="Count")
+                    .sort_values("Rating")
+                )
+                if not rating_mix.empty:
+                    fig_rating = px.bar(
+                        rating_mix,
+                        x="Rating",
+                        y="Count",
+                        title="Distribuzione Rating (1-2-3)",
+                        text="Count",
+                        color="Rating",
+                        color_discrete_sequence=px.colors.sequential.Teal,
+                    )
+                    st.plotly_chart(fig_rating, use_container_width=True)
+            with g4:
+                dir_mix = (
+                    df_f["Direction"]
+                    .fillna("N/D")
+                    .value_counts()
+                    .rename_axis("Direction")
+                    .reset_index(name="Count")
+                )
+                if not dir_mix.empty:
+                    fig_dir = px.bar(
+                        dir_mix,
+                        x="Direction",
+                        y="Count",
+                        title="Direzione vs Target",
+                        text="Count",
+                        color="Direction",
+                        color_discrete_sequence=px.colors.sequential.Teal,
+                    )
+                    st.plotly_chart(fig_dir, use_container_width=True)
+
             if area_sel in ["TUTTE", "LONG GAME / RANGE", "SHORT GAME"]:
-                df_sc = df_f.copy()
-                df_sc["Lateral_Error"] = df_sc.apply(calc_lateral, axis=1)
                 fig_scatter = px.scatter(
-                    df_sc,
+                    df_f,
                     x="Lateral_Error",
                     y="Club",
                     color="Club",
@@ -371,7 +418,10 @@ with tab_review:
 
             dft = df_f.copy()
             dft["Date"] = pd.to_datetime(dft["Date"], errors="coerce")
-            trend = dft.dropna(subset=["Date"]).groupby("Date", as_index=False).agg(Rating=("Rating", "mean"), Proximity=("Proximity", "mean")).sort_values("Date")
+            trend = dft.dropna(subset=["Date"]).groupby("Date", as_index=False).agg(
+                Rating=("Rating", "mean"),
+                Proximity=("Proximity", "mean"),
+            ).sort_values("Date")
             if not trend.empty:
                 fig_trend = px.line(
                     trend,
@@ -382,6 +432,21 @@ with tab_review:
                     color_discrete_sequence=[COLORS["BrandTeal"], COLORS["Gold"]],
                 )
                 st.plotly_chart(fig_trend, use_container_width=True)
+
+            rolling_src = df_f.sort_values("DateTime").copy()
+            rolling_src["Rating_Rolling_20"] = rolling_src["Rating"].rolling(20, min_periods=5).mean()
+            rolling_src["Proximity_Rolling_20"] = rolling_src["Proximity"].rolling(20, min_periods=5).mean()
+            rolling_src = rolling_src.dropna(subset=["Rating_Rolling_20", "Proximity_Rolling_20"])
+            if not rolling_src.empty:
+                fig_roll = px.line(
+                    rolling_src,
+                    x="ShotSeq",
+                    y=["Rating_Rolling_20", "Proximity_Rolling_20"],
+                    title="Trend Rolling (ultimi 20 colpi)",
+                    color_discrete_sequence=[COLORS["BrandTeal"], COLORS["Gold"]],
+                )
+                fig_roll.update_layout(xaxis_title="Sequenza colpi", yaxis_title="Media mobile")
+                st.plotly_chart(fig_roll, use_container_width=True)
 
             dclub = df_f.copy()
             dclub["Rating"] = pd.to_numeric(dclub["Rating"], errors="coerce")
@@ -401,6 +466,61 @@ with tab_review:
                 )
                 fig_club.update_layout(xaxis_title="Proximity media (m)", yaxis_title="Rating medio")
                 st.plotly_chart(fig_club, use_container_width=True)
+
+            heat_src = df_f.copy()
+            heat_src["Lie"] = heat_src["Lie"].fillna("-")
+            heat_src["Impact"] = heat_src["Impact"].fillna("-")
+            heat = pd.pivot_table(
+                heat_src,
+                index="Lie",
+                columns="Impact",
+                values="Rating",
+                aggfunc="mean",
+            )
+            if not heat.empty:
+                fig_heat = px.imshow(
+                    heat,
+                    text_auto=".2f",
+                    aspect="auto",
+                    color_continuous_scale="Teal",
+                    title="Heatmap Qualita Esecuzione (Lie x Impatto)",
+                )
+                st.plotly_chart(fig_heat, use_container_width=True)
+
+            st.markdown("#### Tabelle Pro")
+            t1, t2 = st.columns(2)
+            with t1:
+                club_table = (
+                    df_f.groupby("Club", as_index=False)
+                    .agg(
+                        Shots=("Club", "count"),
+                        Rating_Medio=("Rating", "mean"),
+                        Proximity_Media=("Proximity", "mean"),
+                        Proximity_STD=("Proximity", "std"),
+                    )
+                    .fillna(0.0)
+                )
+                if not club_table.empty:
+                    club_table["Performance_Score"] = (
+                        (club_table["Rating_Medio"] / 3.0) * 70
+                        + (1 - club_table["Proximity_Media"] / (club_table["Proximity_Media"].max() + 1e-9)) * 30
+                    )
+                    club_table = club_table.sort_values("Performance_Score", ascending=False).round(2)
+                    st.dataframe(club_table, use_container_width=True, height=280)
+            with t2:
+                session_table = (
+                    df_f.groupby("SessionName", as_index=False)
+                    .agg(
+                        Shots=("SessionName", "count"),
+                        Rating_Medio=("Rating", "mean"),
+                        Elite_Rate=("Rating", lambda s: (s == 3).mean() * 100),
+                        Proximity_Media=("Proximity", "mean"),
+                    )
+                    .sort_values("Shots", ascending=False)
+                    .round(2)
+                )
+                if not session_table.empty:
+                    st.dataframe(session_table, use_container_width=True, height=280)
 
             st.markdown("#### Registro colpi (filtro attivo)")
             cols_view = ["Date", "Time", "SessionName", "Category", "Club", "Start_Dist", "Lie", "Impact", "Curvature", "Height", "Direction", "Proximity", "Rating"]
