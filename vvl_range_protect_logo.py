@@ -13,8 +13,7 @@ from streamlit_gsheets import GSheetsConnection
 st.set_page_config(page_title="Supernova Sport Science", page_icon="⛳", layout="wide")
 
 COLORS = {
-    "BrandTeal": "#3AB4B8",
-    "DarkTeal": "#2A8285",
+    
     "Gold": "#DAA520",
     "White": "#FFFFFF",
     "Grey": "#F3F4F6",
