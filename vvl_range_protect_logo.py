@@ -130,9 +130,19 @@ def inject_styles() -> None:
     #MainMenu {{visibility: hidden; height: 0;}}
     footer {{visibility: hidden; height: 0;}}
     header [data-testid="stHeader"] {{background: {WHITE};}}
-    .stApp {{ background: linear-gradient(180deg, {OFF_WHITE} 0%, {WHITE} 40%); color: {TEXT}; }}
-    .block-container {{ padding-top: 0.75rem; padding-bottom: 4rem; max-width: 720px; }}
+    .stApp {{ background: radial-gradient(circle at 15% -5%, #f6ecd0 0%, {OFF_WHITE} 30%, {WHITE} 70%); color: {TEXT}; }}
+    .block-container {{ padding-top: 0.75rem; padding-bottom: 4rem; max-width: 760px; }}
     h1, h2, h3 {{ color: {GOLD_DARK}; font-weight: 700; letter-spacing: 0.02em; }}
+    [data-testid="stTabs"] button[role="tab"] {{
+        font-size: 1rem !important;
+        font-weight: 700 !important;
+        border-radius: 12px 12px 0 0 !important;
+        color: {MUTED} !important;
+    }}
+    [data-testid="stTabs"] button[aria-selected="true"] {{
+        color: {GOLD_DARK} !important;
+        background: linear-gradient(180deg, #fffdf7, #f6f1df) !important;
+    }}
     div[data-testid="stHorizontalBlock"] button {{
         min-height: 3.2rem !important;
         font-size: 1.05rem !important;
@@ -173,6 +183,37 @@ def inject_styles() -> None:
     [data-testid="stSidebar"] {{
         background: {OFF_WHITE};
     }}
+    .sn-hero {{
+        background: linear-gradient(120deg, #fffef9, #f8f2df);
+        border: 1px solid #e8dcb4;
+        border-radius: 18px;
+        padding: 14px 16px;
+        margin: 8px 0 16px 0;
+        box-shadow: 0 3px 14px rgba(139, 105, 20, 0.07);
+    }}
+    .sn-hero-title {{
+        font-size: 1.05rem;
+        font-weight: 800;
+        color: {GOLD_DARK};
+        margin-bottom: 4px;
+    }}
+    .sn-hero-sub {{
+        color: {MUTED};
+        font-size: 0.92rem;
+        margin: 0;
+    }}
+    .sn-chip {{
+        display: inline-block;
+        background: #fff;
+        border: 1px solid #e7d9ab;
+        border-radius: 999px;
+        padding: 4px 10px;
+        margin-right: 6px;
+        margin-top: 6px;
+        color: #6d5717;
+        font-size: 0.8rem;
+        font-weight: 700;
+    }}
 </style>
 """,
         unsafe_allow_html=True,
@@ -201,6 +242,22 @@ def brand_header(title: str | None = None) -> None:
 def brand_footer() -> None:
     st.markdown(
         "<div class='sn-footer'>Powered by Supernova Sport Science</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def render_hero(title: str, subtitle: str, chips: list[str] | None = None) -> None:
+    chips_html = ""
+    if chips:
+        chips_html = "".join([f"<span class='sn-chip'>{c}</span>" for c in chips])
+    st.markdown(
+        (
+            "<div class='sn-hero'>"
+            f"<div class='sn-hero-title'>{title}</div>"
+            f"<p class='sn-hero-sub'>{subtitle}</p>"
+            f"{chips_html}"
+            "</div>"
+        ),
         unsafe_allow_html=True,
     )
 
@@ -573,13 +630,96 @@ def satisfaction_breakdown(df: pd.DataFrame, cat_key: str) -> None:
         sub,
         "Rating",
         "Distribuzione voto colpo (1–5)",
-        "Legenda: percentuale di colpi per ogni votoqualità auto-valutata.",
+        "Legenda: percentuale di colpi per ogni voto di qualità auto-valutata.",
     )
     plot_pie(
         sub,
         "Mental_Reaction",
         "Reazione mentale",
         "Legenda: mix delle reazioni emotive/cognitive dichiarate dopo il colpo.",
+    )
+
+
+def trend_panel(df_sector: pd.DataFrame, sector_label: str) -> None:
+    if df_sector.empty:
+        return
+    d = df_sector.copy()
+    d["Date"] = pd.to_datetime(d["Date"], errors="coerce")
+    d = d.dropna(subset=["Date"])
+    if d.empty:
+        return
+    d["Rating"] = pd.to_numeric(d["Rating"], errors="coerce")
+    d["Strokes_Gained"] = pd.to_numeric(d["Strokes_Gained"], errors="coerce")
+    grp = (
+        d.groupby("Date", as_index=False)
+        .agg(
+            rating_mean=("Rating", "mean"),
+            sg_mean=("Strokes_Gained", "mean"),
+            shots=("Category", "count"),
+        )
+        .sort_values("Date")
+    )
+    st.markdown("#### Trend giornaliero")
+    st.caption(
+        "Linea oro = voto medio; linea scura = strokes gained medio per giorno. "
+        "Serve a capire se la qualità sale o scende nel tempo."
+    )
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=grp["Date"],
+            y=grp["rating_mean"],
+            mode="lines+markers",
+            name="Voto medio",
+            line=dict(color=GOLD, width=3),
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=grp["Date"],
+            y=grp["sg_mean"],
+            mode="lines+markers",
+            name="SG medio",
+            line=dict(color="#5c4a12", width=2),
+            yaxis="y2",
+        )
+    )
+    fig.update_layout(
+        title=f"Andamento performance - {sector_label}",
+        xaxis_title="Data",
+        yaxis=dict(title="Voto medio (1-5)"),
+        yaxis2=dict(title="SG medio", overlaying="y", side="right"),
+        legend_title_text="Legenda",
+        margin=dict(t=48, b=24, l=24, r=24),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+
+def club_breakdown_table(df_sector: pd.DataFrame) -> None:
+    d = df_sector.copy()
+    if d.empty:
+        return
+    d["Rating"] = pd.to_numeric(d["Rating"], errors="coerce")
+    d["Strokes_Gained"] = pd.to_numeric(d["Strokes_Gained"], errors="coerce")
+    g = (
+        d.groupby("Club", as_index=False)
+        .agg(
+            Colpi=("Club", "count"),
+            Voto_medio=("Rating", "mean"),
+            SG_medio=("Strokes_Gained", "mean"),
+        )
+        .sort_values(["Colpi", "Voto_medio"], ascending=[False, False])
+    )
+    if g.empty:
+        return
+    st.markdown("#### Ranking bastoni (nel filtro scelto)")
+    st.caption(
+        "Tabella sintetica per bastone: volume, voto medio e strokes gained medio."
+    )
+    st.dataframe(
+        g.style.format({"Voto_medio": "{:.2f}", "SG_medio": "{:+.3f}"}),
+        use_container_width=True,
+        hide_index=True,
     )
 
 
@@ -922,6 +1062,11 @@ def wizard_putt(session_name: str, user: str) -> None:
 def review_panel(user: str, session_name: str) -> None:
     df_all = load_data()
     df_u = df_all[df_all["User"] == user]
+    render_hero(
+        "Review performance",
+        "Seleziona settore e periodo per aprire una dashboard completa con grafici, SG e tabelle.",
+        ["Pie charts", "Dispersione", "Strokes Gained", "Trend", "Putting make%"],
+    )
     st.markdown("### Review — statistiche")
     period = st.selectbox("Periodo", PERIOD_LABELS, key="rev_period")
     df_f = filter_period(df_u, session_name, period)
@@ -951,6 +1096,8 @@ def review_panel(user: str, session_name: str) -> None:
     m3.metric("SG medio", f"{sg_series.mean():+.3f}" if len(sg_series) else "—")
 
     sg_summary_table(df_f, sector)
+    trend_panel(dsec, CATEGORIES[sector])
+    club_breakdown_table(dsec)
 
     if sector == "RANGE":
         plot_pie(
@@ -1025,6 +1172,11 @@ def main() -> None:
 
     with tab_in:
         brand_header("Inserimento rapido")
+        render_hero(
+            "Sessione di raccolta dati",
+            "Input veloce a step singoli con pulsanti grandi, pensato per utilizzo smartphone sul campo pratica.",
+            ["Range", "Short game", "Putting"],
+        )
         st.session_state.setdefault("wz_cat", None)
         if st.session_state["wz_cat"] is None:
             st.markdown("#### Scegli il settore")
@@ -1064,4 +1216,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
