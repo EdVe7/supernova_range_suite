@@ -1170,6 +1170,14 @@ def main() -> None:
     with st.sidebar:
         brand_header("Profilo")
         st.write(f"**Atleta:** {user}")
+        st.markdown("### Sezione")
+        page = st.selectbox(
+            "Apri sezione",
+            ["Inserimento dati", "Review"],
+            index=0,
+            key="main_page_sidebar",
+            label_visibility="collapsed",
+        )
         session_name = st.text_input("Nome sessione / note", value="Sessione Allenamento")
         st.divider()
         if st.button("Logout / cambia utente", use_container_width=True):
@@ -1178,12 +1186,15 @@ def main() -> None:
             st.rerun()
 
     st.markdown("### Navigazione")
-    page = st.radio(
+    page_top = st.radio(
         "Vai a",
         ["Inserimento dati", "Review"],
         horizontal=True,
+        index=0 if page == "Inserimento dati" else 1,
+        key="main_page_top",
         label_visibility="collapsed",
     )
+    page = page_top
 
     if page == "Inserimento dati":
         brand_header("Inserimento rapido")
