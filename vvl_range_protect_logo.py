@@ -39,13 +39,19 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
+
 GOLD = "#C9A227"
 GOLD_LIGHT = "#E8D48A"
-GOLD_DARK = "#8B6914"
+GOLD_DARK = "#7A5B12"
 WHITE = "#FFFFFF"
-OFF_WHITE = "#FAFAF8"
-TEXT = "#2B2B2B"
-MUTED = "#6B6560"
+OFF_WHITE = "#F8F7F4"
+TEXT = "#1E2430"
+MUTED = "#596174"
+ACCENT_BLUE = "#2F6DF6"
+ACCENT_BLUE_SOFT = "#EAF0FF"
+SUCCESS_GREEN = "#17A673"
+CARD_BG = "#FFFFFF"
+CARD_BORDER = "#E7EAF1"
 
 PASSWORD_DEFAULT = "supernova.analytics"
 
@@ -136,92 +142,202 @@ def inject_styles() -> None:
     st.markdown(
         f"""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap');
     #MainMenu {{visibility: hidden; height: 0;}}
     footer {{visibility: hidden; height: 0;}}
-    header [data-testid="stHeader"] {{background: {WHITE};}}
-    .stApp {{ background: radial-gradient(circle at 15% -5%, #f6ecd0 0%, {OFF_WHITE} 30%, {WHITE} 70%); color: {TEXT}; }}
-    .block-container {{ padding-top: 0.75rem; padding-bottom: 4rem; max-width: 760px; }}
-    h1, h2, h3 {{ color: {GOLD_DARK}; font-weight: 700; letter-spacing: 0.02em; }}
+    header [data-testid="stHeader"] {{background: transparent;}}
+    html, body, [class*="css"] {{
+        font-family: 'Inter', sans-serif;
+        color: {TEXT};
+    }}
+    .stApp {{
+        background:
+            radial-gradient(circle at 85% 8%, #dce8ff 0%, rgba(220,232,255,0.0) 28%),
+            radial-gradient(circle at 10% -5%, #f7ebc8 0%, rgba(247,235,200,0.0) 32%),
+            linear-gradient(180deg, #f5f7fb 0%, #ffffff 46%);
+        color: {TEXT};
+    }}
+    .block-container {{
+        padding-top: 0.75rem;
+        padding-bottom: 4rem;
+        max-width: 860px;
+    }}
+    h1, h2, h3 {{
+        color: {TEXT};
+        font-family: 'Manrope', sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+    }}
+    h3 {{
+        margin-top: 0.25rem;
+    }}
+    p, span, label {{
+        color: {TEXT};
+    }}
     [data-testid="stTabs"] button[role="tab"] {{
-        font-size: 1rem !important;
+        font-size: 0.98rem !important;
         font-weight: 700 !important;
-        border-radius: 12px 12px 0 0 !important;
+        border-radius: 12px !important;
         color: {MUTED} !important;
+        border: 1px solid transparent !important;
+        background: transparent !important;
     }}
     [data-testid="stTabs"] button[aria-selected="true"] {{
-        color: {GOLD_DARK} !important;
-        background: linear-gradient(180deg, #fffdf7, #f6f1df) !important;
-    }}
-    div[data-testid="stHorizontalBlock"] button {{
-        min-height: 3.2rem !important;
-        font-size: 1.05rem !important;
-        border-radius: 14px !important;
-        border: 2px solid {GOLD} !important;
-        background: {WHITE} !important;
         color: {TEXT} !important;
+        border-color: {CARD_BORDER} !important;
+        background: {WHITE} !important;
+        box-shadow: 0 6px 20px rgba(30, 36, 48, 0.08) !important;
+    }}
+    div[data-testid="stSelectbox"], div[data-testid="stTextInput"], div[data-testid="stNumberInput"] {{
+        background: transparent;
+    }}
+    div[data-baseweb="select"] > div,
+    .stTextInput input,
+    .stNumberInput input {{
+        border-radius: 12px !important;
+        border: 1px solid #d9dee8 !important;
+        background: #fff !important;
+        min-height: 2.7rem !important;
+    }}
+    .stTextInput input:focus,
+    .stNumberInput input:focus {{
+        border-color: {ACCENT_BLUE} !important;
+        box-shadow: 0 0 0 2px rgba(47, 109, 246, 0.13) !important;
+    }}
+    [data-testid="stMetric"] {{
+        background: {CARD_BG};
+        border: 1px solid {CARD_BORDER};
+        border-radius: 14px;
+        padding: 8px 10px;
+        box-shadow: 0 6px 18px rgba(28, 40, 64, 0.06);
+    }}
+    [data-testid="stMetricLabel"] {{
+        color: {MUTED} !important;
         font-weight: 600 !important;
     }}
+    [data-testid="stMetricValue"] {{
+        color: {TEXT} !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-weight: 800 !important;
+    }}
+    div[data-testid="stHorizontalBlock"] button {{
+        min-height: 3.15rem !important;
+        font-size: 1rem !important;
+        border-radius: 14px !important;
+        border: 1px solid #d7ddeb !important;
+        background: {WHITE} !important;
+        color: {TEXT} !important;
+        font-weight: 700 !important;
+        transition: all .14s ease-in-out !important;
+    }}
     div[data-testid="stHorizontalBlock"] button:hover {{
-        background: linear-gradient(180deg, {GOLD_LIGHT}, {GOLD}) !important;
-        color: #111 !important;
+        border-color: {ACCENT_BLUE} !important;
+        box-shadow: 0 8px 16px rgba(47,109,246,0.15) !important;
+        transform: translateY(-1px);
     }}
     .sn-big-btn > button {{
         width: 100%;
         min-height: 3.5rem;
-        font-size: 1.1rem;
+        font-size: 1.05rem;
         border-radius: 16px;
         background: {WHITE};
-        border: 2px solid {GOLD};
+        border: 1px solid #d7ddeb;
         font-weight: 700;
+    }}
+    .stButton > button[kind="primary"], .stDownloadButton > button {{
+        border-radius: 14px !important;
+        border: 0 !important;
+        color: #fff !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, {ACCENT_BLUE}, #5f89f8) !important;
+        box-shadow: 0 8px 18px rgba(47,109,246,0.28) !important;
+    }}
+    .stButton > button[kind="primary"]:hover, .stDownloadButton > button:hover {{
+        filter: brightness(1.04);
+        transform: translateY(-1px);
+    }}
+    .stRadio > div {{
+        background: {CARD_BG};
+        border: 1px solid {CARD_BORDER};
+        border-radius: 14px;
+        padding: 8px 10px;
+        box-shadow: 0 4px 14px rgba(28,40,64,0.05);
+    }}
+    .stCaption {{
+        color: {MUTED} !important;
     }}
     .sn-footer {{
         text-align: center;
         color: {MUTED};
-        font-size: 0.85rem;
+        font-size: 0.82rem;
         margin-top: 2rem;
-        padding: 0.75rem;
-        border-top: 1px solid {GOLD_LIGHT};
+        padding: 0.8rem;
+        border-top: 1px solid #e6eaf2;
     }}
     .sn-logo-caption {{
         font-style: italic;
-        color: {GOLD_DARK};
+        color: {MUTED};
         font-weight: 600;
-        font-size: 0.95rem;
+        font-size: 0.9rem;
         margin: 0;
     }}
     [data-testid="stSidebar"] {{
-        background: {OFF_WHITE};
+        background: linear-gradient(180deg, #f7f8fc, #fdfefe);
+        border-right: 1px solid #e8ecf3;
+    }}
+    [data-testid="stSidebar"] .block-container {{
+        padding-top: 1rem;
     }}
     .sn-hero {{
-        background: linear-gradient(120deg, #fffef9, #f8f2df);
-        border: 1px solid #e8dcb4;
+        background: linear-gradient(122deg, #ffffff, #f8fbff);
+        border: 1px solid {CARD_BORDER};
         border-radius: 18px;
         padding: 14px 16px;
         margin: 8px 0 16px 0;
-        box-shadow: 0 3px 14px rgba(139, 105, 20, 0.07);
+        box-shadow: 0 12px 24px rgba(33, 44, 68, 0.08);
     }}
     .sn-hero-title {{
-        font-size: 1.05rem;
+        font-size: 1.08rem;
         font-weight: 800;
-        color: {GOLD_DARK};
+        color: {TEXT};
         margin-bottom: 4px;
     }}
     .sn-hero-sub {{
         color: {MUTED};
-        font-size: 0.92rem;
+        font-size: 0.9rem;
         margin: 0;
     }}
     .sn-chip {{
         display: inline-block;
-        background: #fff;
-        border: 1px solid #e7d9ab;
+        background: {ACCENT_BLUE_SOFT};
+        border: 1px solid #cddaff;
         border-radius: 999px;
         padding: 4px 10px;
         margin-right: 6px;
         margin-top: 6px;
-        color: #6d5717;
+        color: #355ac6;
         font-size: 0.8rem;
         font-weight: 700;
+    }}
+    .sn-panel {{
+        background: {CARD_BG};
+        border: 1px solid {CARD_BORDER};
+        border-radius: 16px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 18px rgba(29, 41, 65, 0.06);
+    }}
+    .sn-panel-title {{
+        font-family: 'Manrope', sans-serif;
+        font-size: 0.98rem;
+        color: {TEXT};
+        font-weight: 800;
+        margin-bottom: 2px;
+    }}
+    .sn-panel-sub {{
+        color: {MUTED};
+        font-size: 0.86rem;
+        margin: 0;
     }}
 </style>
 """,
@@ -265,6 +381,18 @@ def render_hero(title: str, subtitle: str, chips: list[str] | None = None) -> No
             f"<div class='sn-hero-title'>{title}</div>"
             f"<p class='sn-hero-sub'>{subtitle}</p>"
             f"{chips_html}"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def render_panel(title: str, subtitle: str) -> None:
+    st.markdown(
+        (
+            "<div class='sn-panel'>"
+            f"<div class='sn-panel-title'>{title}</div>"
+            f"<p class='sn-panel-sub'>{subtitle}</p>"
             "</div>"
         ),
         unsafe_allow_html=True,
@@ -1077,6 +1205,10 @@ def review_panel(user: str, session_name: str) -> None:
         ["Pie charts", "Dispersione", "Strokes Gained", "Trend", "Putting make%"],
     )
     st.markdown("### Review — statistiche")
+    render_panel(
+        "Filtro analisi",
+        "Scegli prima periodo e settore. La dashboard sotto si aggiorna in tempo reale.",
+    )
     period = st.selectbox("Periodo", PERIOD_LABELS, key="rev_period")
     df_f = filter_period(df_u, session_name, period)
     sector = st.radio(
@@ -1109,6 +1241,10 @@ def review_panel(user: str, session_name: str) -> None:
     club_breakdown_table(dsec)
 
     if sector == "RANGE":
+        render_panel(
+            "Analisi tecnica range",
+            "Impatti, curvatura, direzione e dispersione per identificare pattern e bias di traiettoria.",
+        )
         plot_pie(
             dsec,
             "Impact",
@@ -1131,6 +1267,10 @@ def review_panel(user: str, session_name: str) -> None:
         satisfaction_breakdown(df_f, "RANGE")
 
     elif sector == "SHORT":
+        render_panel(
+            "Analisi tecnica gioco corto",
+            "Confronta lie iniziale/finale, contatto e direzione per leggere conversione e qualità d'esecuzione.",
+        )
         plot_pie(dsec, "Lie_Start", "Lie iniziale", "Legenda: da dove parte la palla più spesso.")
         plot_pie(dsec, "Lie_End", "Lie finale", "Legenda: dove finisce la palla dopo il colpo.")
         plot_pie(dsec, "Impact", "Impatto", "Legenda: qualità di contatto dichiarata.")
@@ -1139,6 +1279,10 @@ def review_panel(user: str, session_name: str) -> None:
         satisfaction_breakdown(df_f, "SHORT")
 
     else:
+        render_panel(
+            "Analisi putting",
+            "Contatto faccia, linea e percentuali realizzazione per fascia distanza.",
+        )
         plot_pie(dsec, "Impact", "Impatto sulla faccia", "Legenda: zona di contatto sul putter.")
         plot_pie(dsec, "Trajectory", "Traiettoria di rotazione", "Legenda: pull/dritta/push.")
         putting_make_table(dsec)
@@ -1169,6 +1313,10 @@ def main() -> None:
 
     with st.sidebar:
         brand_header("Profilo")
+        render_panel(
+            "Navigazione",
+            "Passa tra raccolta dati e review analytics. La scelta e' sempre disponibile qui.",
+        )
         st.write(f"**Atleta:** {user}")
         st.markdown("### Sezione")
         page = st.selectbox(
@@ -1180,6 +1328,10 @@ def main() -> None:
         )
         session_name = st.text_input("Nome sessione / note", value="Sessione Allenamento")
         st.divider()
+        render_panel(
+            "Sessione attiva",
+            "Il nome sessione viene usato nel filtro 'Sessione corrente' in Review.",
+        )
         if st.button("Logout / cambia utente", use_container_width=True):
             st.session_state["logged_in"] = False
             st.session_state.pop("user", None)
