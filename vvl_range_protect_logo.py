@@ -38,7 +38,7 @@ st.markdown(f"""
     .stApp {{background: linear-gradient(180deg, #FFFFFF 0%, #FFFBEF 75%, #F8EFCF 100%);}}
     </style>
     """, unsafe_allow_html=True)
-
+    
 
 GOLD = "#C9A227"
 GOLD_LIGHT = "#E8D48A"
@@ -92,8 +92,27 @@ LONG_CURVE = ["Dritta", "Fade", "Draw", "Slice", "Hook", "Push", "Pull"]
 LONG_DIR = ["Esattamente in linea", "A destra del bersaglio", "A sinistra del bersaglio"]
 
 SHORT_IMPACT = ["Dritta", "Punta", "Tacco", "Shank", "Top", "Flappa"]
-SHORT_LIE_START = ["Fairway", "Rough", "Bunker"]
-SHORT_LIE_END = ["Fairway", "Rough", "Bunker", "Green"]
+SHORT_LIE_START = [
+    "Fairway",
+    "First cut",
+    "Rough",
+    "Semi-rough",
+    "Bunker",
+    "Fringe",
+    "Green",
+    "Bare lie / Terra dura",
+    "Pine straw",
+]
+SHORT_LIE_END = [
+    "Fairway",
+    "First cut",
+    "Rough",
+    "Semi-rough",
+    "Bunker",
+    "Fringe",
+    "Green",
+    "Fuori limite area target",
+]
 SHORT_DIR = ["Esattamente in linea", "A destra della buca", "A sinistra della buca"]
 
 PUTT_IMPACT = ["Centro", "Punta", "Tacco", "Flappa"]
@@ -282,8 +301,23 @@ def inject_styles() -> None:
         margin: 0;
     }}
     [data-testid="stSidebar"] {{
-        background: linear-gradient(180deg, #f7f8fc, #fdfefe);
+        background: linear-gradient(180deg, #1c2432 0%, #253249 40%, #f7f8fc 40.2%, #fdfefe 100%);
         border-right: 1px solid #e8ecf3;
+    }}
+    [data-testid="stSidebar"] * {{
+        color: #f4f7ff;
+    }}
+    [data-testid="stSidebar"] .stTextInput label,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] p {{
+        color: #f4f7ff !important;
+    }}
+    [data-testid="stSidebar"] div[data-baseweb="select"] > div,
+    [data-testid="stSidebar"] .stTextInput input {{
+        background: rgba(255,255,255,0.95) !important;
+        color: #1d2433 !important;
     }}
     [data-testid="stSidebar"] .block-container {{
         padding-top: 1rem;
@@ -399,6 +433,46 @@ def render_panel(title: str, subtitle: str) -> None:
     )
 
 
+def render_command_header(page: str) -> None:
+    st.markdown(
+        (
+            "<div class='sn-panel'>"
+            "<div class='sn-panel-title'>Supernova Coach Command Center</div>"
+            f"<p class='sn-panel-sub'>Sezione attiva: <b>{page}</b> · "
+            "UI ottimizzata per lettura rapida coach-atleta in campo.</p>"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def distance_input(
+    label: str,
+    key: str,
+    min_value: float,
+    max_value: float,
+    step: float,
+    presets: list[float] | None = None,
+) -> float:
+    st.markdown(f"**{label}**")
+    value = st.number_input(
+        "metri",
+        min_value=min_value,
+        max_value=max_value,
+        step=step,
+        key=key,
+        label_visibility="collapsed",
+    )
+    if presets:
+        st.caption("Preset rapidi")
+        cols = st.columns(min(len(presets), 5))
+        for i, p in enumerate(presets[:5]):
+            if cols[i].button(f"{p:g} m", key=f"{key}_p{i}", use_container_width=True):
+                st.session_state[key] = float(p)
+                st.rerun()
+    return float(st.session_state.get(key, value))
+
+
 # =============================================================================
 # Strokes gained (modello semplificato da practice — coerente tra settori)
 # =============================================================================
@@ -427,7 +501,18 @@ def expected_short_hole(dist_m: float, lie: str) -> float:
     """Colpi attesi fino alla buca dal gioco corto (non green)."""
     if dist_m <= 0:
         return 0.0
-    lie_adj = {"Fairway": 0.0, "Rough": 0.18, "Bunker": 0.55, "Green": 0.0}
+    lie_adj = {
+        "Fairway": 0.0,
+        "First cut": 0.10,
+        "Semi-rough": 0.14,
+        "Rough": 0.20,
+        "Bunker": 0.55,
+        "Fringe": 0.05,
+        "Green": 0.0,
+        "Bare lie / Terra dura": 0.12,
+        "Pine straw": 0.18,
+        "Fuori limite area target": 0.30,
+    }
     base = 2.08 + (dist_m / 45.0) * 0.95
     return float(base + lie_adj.get(lie, 0.0))
 
@@ -796,6 +881,7 @@ def trend_panel(df_sector: pd.DataFrame, sector_label: str) -> None:
         )
         .sort_values("Date")
     )
+    grp["Day"] = grp["Date"].dt.strftime("%d/%m/%Y")
     st.markdown("#### Trend giornaliero")
     st.caption(
         "Linea oro = voto medio; linea scura = strokes gained medio per giorno. "
@@ -823,11 +909,16 @@ def trend_panel(df_sector: pd.DataFrame, sector_label: str) -> None:
     )
     fig.update_layout(
         title=f"Andamento performance - {sector_label}",
-        xaxis_title="Data",
+        xaxis_title="Giorno",
         yaxis=dict(title="Voto medio (1-5)"),
         yaxis2=dict(title="SG medio", overlaying="y", side="right"),
         legend_title_text="Legenda",
         margin=dict(t=48, b=24, l=24, r=24),
+    )
+    fig.update_xaxes(
+        tickformat="%d/%m/%Y",
+        ticklabelmode="period",
+        hoverformat="%d/%m/%Y",
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -858,6 +949,72 @@ def club_breakdown_table(df_sector: pd.DataFrame) -> None:
         use_container_width=True,
         hide_index=True,
     )
+
+
+def sg_distance_table(df_sector: pd.DataFrame) -> None:
+    d = df_sector.copy()
+    d["Start_Dist_m"] = pd.to_numeric(d["Start_Dist_m"], errors="coerce")
+    d["Strokes_Gained"] = pd.to_numeric(d["Strokes_Gained"], errors="coerce")
+    d = d.dropna(subset=["Start_Dist_m", "Strokes_Gained"])
+    if d.empty:
+        return
+    bins = [0, 2, 5, 10, 20, 35, 50, 80, 130, 200, 600]
+    labels = ["0-2", "2-5", "5-10", "10-20", "20-35", "35-50", "50-80", "80-130", "130-200", "200+"]
+    d["Distance_Bucket"] = pd.cut(d["Start_Dist_m"], bins=bins, labels=labels, include_lowest=True, right=False)
+    g = (
+        d.groupby("Distance_Bucket", as_index=False)
+        .agg(Colpi=("Strokes_Gained", "count"), SG_medio=("Strokes_Gained", "mean"))
+        .dropna()
+    )
+    if g.empty:
+        return
+    st.markdown("#### Strokes gained per fascia distanza")
+    st.caption("Aiuta a capire in quali distanze perdi o guadagni colpi rispetto al benchmark usato.")
+    fig = px.bar(
+        g,
+        x="Distance_Bucket",
+        y="SG_medio",
+        color="SG_medio",
+        color_continuous_scale="RdYlGn",
+        labels={"Distance_Bucket": "Fascia metri", "SG_medio": "SG medio"},
+        title="Efficienza SG per distanza iniziale",
+    )
+    fig.add_hline(y=0, line_dash="dash", line_color=GOLD_DARK)
+    fig.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(g.style.format({"SG_medio": "{:+.3f}"}), use_container_width=True, hide_index=True)
+
+
+def directional_bias_panel(df_sector: pd.DataFrame) -> None:
+    d = df_sector.copy()
+    d["x"] = pd.to_numeric(d["Proximity_Lateral_m"], errors="coerce")
+    d = d.dropna(subset=["x"])
+    if d.empty:
+        return
+    left = int((d["x"] < 0).sum())
+    right = int((d["x"] > 0).sum())
+    center = int((d["x"] == 0).sum())
+    total = len(d)
+    st.markdown("#### Directional bias")
+    st.caption("Distribuzione colpi a sinistra/destra/centrali rispetto alla linea target.")
+    bias = pd.DataFrame(
+        {
+            "Direzione": ["Sinistra", "In linea", "Destra"],
+            "Colpi": [left, center, right],
+            "Percentuale": [left / total * 100, center / total * 100, right / total * 100],
+        }
+    )
+    fig = px.bar(
+        bias,
+        x="Direzione",
+        y="Percentuale",
+        text=bias["Percentuale"].map(lambda v: f"{v:.1f}%"),
+        color="Direzione",
+        color_discrete_map={"Sinistra": "#d45858", "In linea": SUCCESS_GREEN, "Destra": ACCENT_BLUE},
+        title="Bias laterale medio",
+    )
+    fig.update_layout(showlegend=False, yaxis_title="% colpi")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 # =============================================================================
@@ -900,14 +1057,28 @@ def wizard_range(session_name: str, user: str) -> None:
                 st.rerun()
     elif step == 4:
         st.markdown("#### Errore laterale (metri assoluti)")
-        lat = st.number_input("Metri a destra/sinistra dal punto mirato", min_value=0.0, step=0.5)
+        lat = distance_input(
+            "Metri a destra/sinistra dal punto mirato",
+            "wz_range_lat",
+            0.0,
+            120.0,
+            0.5,
+            [0, 2, 5, 10, 20],
+        )
         if st.button("Conferma errore laterale", use_container_width=True):
             shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], lat)
             st.session_state["wz_step"] = 5
             st.rerun()
     elif step == 5:
         st.markdown("#### Errore in profondità (per mappa dall’alto)")
-        depth_amt = st.number_input("Quanti metri corto/lungo?", min_value=0.0, step=0.5)
+        depth_amt = distance_input(
+            "Quanti metri corto/lungo?",
+            "wz_range_depth",
+            0.0,
+            120.0,
+            0.5,
+            [0, 2, 5, 10, 20],
+        )
         sense = st.radio("Senso", ["In linea col bersaglio", "Corto del bersaglio", "Lungo del bersaglio"])
         if st.button("Conferma profondità", use_container_width=True):
             shot["Proximity_Depth_m"] = depth_sign(depth_amt, sense)
@@ -931,15 +1102,25 @@ def wizard_range(session_name: str, user: str) -> None:
     elif step == 8:
         st.markdown("#### Dati per Strokes Gained — gioco lungo")
         shot["Lie_Long"] = st.radio("Lie di partenza", ["Tee", "Fairway"])
-        shot["Hole_Dist_Start_m"] = st.number_input(
-            "Distanza dalla buca prima del colpo (metri)", min_value=0.0, step=5.0
+        shot["Hole_Dist_Start_m"] = distance_input(
+            "Distanza dalla buca prima del colpo (metri)",
+            "wz_range_hole_start",
+            0.0,
+            550.0,
+            1.0,
+            [40, 80, 120, 160, 200],
         )
-        shot["Hole_Dist_End_m"] = st.number_input(
-            "Distanza dalla buca dopo il colpo (metri)", min_value=0.0, step=5.0
+        shot["Hole_Dist_End_m"] = distance_input(
+            "Distanza dalla buca dopo il colpo (metri)",
+            "wz_range_hole_end",
+            0.0,
+            550.0,
+            1.0,
+            [0, 10, 30, 60, 100],
         )
         lie_after = st.selectbox(
             "Lie dopo il colpo (per il modello)",
-            ["Fairway", "Rough", "Bunker"],
+            ["Fairway", "First cut", "Semi-rough", "Rough", "Bunker", "Fringe", "Green"],
         )
         if st.button("Calcola e salva colpo", type="primary", use_container_width=True):
             from_tee = shot["Lie_Long"] == "Tee"
@@ -996,8 +1177,13 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 1
                 st.rerun()
     elif step == 1:
-        shot["Start_Dist_m"] = st.number_input(
-            "Distanza iniziale dalla buca (metri)", min_value=0.0, max_value=50.0, step=1.0
+        shot["Start_Dist_m"] = distance_input(
+            "Distanza iniziale dalla buca (metri)",
+            "wz_short_start",
+            0.0,
+            50.0,
+            0.5,
+            [5, 10, 20, 30, 40],
         )
         if st.button("Conferma distanza", use_container_width=True):
             st.session_state["wz_step"] = 2
@@ -1010,7 +1196,14 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 3
                 st.rerun()
     elif step == 3:
-        shot["End_Dist_m"] = st.number_input("Distanza finale dalla buca (metri)", min_value=0.0, step=0.5)
+        shot["End_Dist_m"] = distance_input(
+            "Distanza finale dalla buca (metri)",
+            "wz_short_end",
+            0.0,
+            80.0,
+            0.5,
+            [0, 1, 2, 4, 8],
+        )
         if st.button("Conferma distanza finale", use_container_width=True):
             st.session_state["wz_step"] = 4
             st.rerun()
@@ -1037,13 +1230,27 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 7
                 st.rerun()
     elif step == 7:
-        lat = st.number_input("Metri a destra/sinistra dalla buca", min_value=0.0, step=0.5)
+        lat = distance_input(
+            "Metri a destra/sinistra dalla buca",
+            "wz_short_lat",
+            0.0,
+            80.0,
+            0.5,
+            [0, 1, 2, 4, 8],
+        )
         if st.button("Conferma errore laterale", use_container_width=True):
             shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], lat)
             st.session_state["wz_step"] = 8
             st.rerun()
     elif step == 8:
-        depth_amt = st.number_input("Metri corto/lungo rispetto alla buca", min_value=0.0, step=0.5)
+        depth_amt = distance_input(
+            "Metri corto/lungo rispetto alla buca",
+            "wz_short_depth",
+            0.0,
+            80.0,
+            0.5,
+            [0, 1, 2, 4, 8],
+        )
         sense = st.radio("Senso", ["In linea", "Corto", "Lungo"])
         conv = {"In linea": "In linea col bersaglio", "Corto": "Corto del bersaglio", "Lungo": "Lungo del bersaglio"}
         if st.button("Conferma profondità", use_container_width=True):
@@ -1113,15 +1320,25 @@ def wizard_putt(session_name: str, user: str) -> None:
     shot: dict[str, Any] = st.session_state.setdefault("wz_payload", {})
 
     if step == 0:
-        shot["Start_Dist_m"] = st.number_input(
-            "Distanza iniziale dalla buca (metri)", min_value=0.0, step=0.25
+        shot["Start_Dist_m"] = distance_input(
+            "Distanza iniziale dalla buca (metri)",
+            "wz_putt_start",
+            0.0,
+            60.0,
+            0.1,
+            [0.5, 1, 2, 4, 8],
         )
         if st.button("Avanti", use_container_width=True):
             st.session_state["wz_step"] = 1
             st.rerun()
     elif step == 1:
-        shot["End_Dist_m"] = st.number_input(
-            "Distanza finale (0 se in buca)", min_value=0.0, step=0.1
+        shot["End_Dist_m"] = distance_input(
+            "Distanza finale (0 se in buca)",
+            "wz_putt_end",
+            0.0,
+            30.0,
+            0.05,
+            [0, 0.3, 0.6, 1.0, 2.0],
         )
         if st.button("Conferma distanze", use_container_width=True):
             st.session_state["wz_step"] = 2
@@ -1239,6 +1456,9 @@ def review_panel(user: str, session_name: str) -> None:
     sg_summary_table(df_f, sector)
     trend_panel(dsec, CATEGORIES[sector])
     club_breakdown_table(dsec)
+    sg_distance_table(dsec)
+    if sector in ("RANGE", "SHORT"):
+        directional_bias_panel(dsec)
 
     if sector == "RANGE":
         render_panel(
@@ -1337,6 +1557,8 @@ def main() -> None:
             st.session_state.pop("user", None)
             st.rerun()
 
+    render_command_header(page)
+
     if page == "Inserimento dati":
         brand_header("Inserimento rapido")
         render_hero(
@@ -1383,4 +1605,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
