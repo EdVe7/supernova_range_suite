@@ -44,14 +44,17 @@ GOLD = "#C9A227"
 GOLD_LIGHT = "#E8D48A"
 GOLD_DARK = "#7A5B12"
 WHITE = "#FFFFFF"
-OFF_WHITE = "#F8F7F4"
-TEXT = "#1E2430"
-MUTED = "#596174"
-ACCENT_BLUE = "#2F6DF6"
-ACCENT_BLUE_SOFT = "#EAF0FF"
+OFF_WHITE = "#FFF9F2"
+TEXT = "#403022"
+MUTED = "#8A6F55"
+ACCENT_BLUE = "#5A8DEE"
+ACCENT_BLUE_SOFT = "#EEF4FF"
 SUCCESS_GREEN = "#17A673"
 CARD_BG = "#FFFFFF"
-CARD_BORDER = "#E7EAF1"
+CARD_BORDER = "#F1DCC7"
+ORANGE = "#F08A24"
+ORANGE_SOFT = "#FFE7CF"
+ORANGE_LIGHT = "#FFF1E3"
 
 PASSWORD_DEFAULT = "supernova.analytics"
 
@@ -171,9 +174,9 @@ def inject_styles() -> None:
     }}
     .stApp {{
         background:
-            radial-gradient(circle at 85% 8%, #dce8ff 0%, rgba(220,232,255,0.0) 28%),
+            radial-gradient(circle at 85% 8%, #ffe2c4 0%, rgba(255,226,196,0.0) 30%),
             radial-gradient(circle at 10% -5%, #f7ebc8 0%, rgba(247,235,200,0.0) 32%),
-            linear-gradient(180deg, #f5f7fb 0%, #ffffff 46%);
+            linear-gradient(180deg, #fff6ed 0%, #ffffff 52%);
         color: {TEXT};
     }}
     .block-container {{
@@ -203,9 +206,9 @@ def inject_styles() -> None:
     }}
     [data-testid="stTabs"] button[aria-selected="true"] {{
         color: {TEXT} !important;
-        border-color: {CARD_BORDER} !important;
+        border-color: #efc79e !important;
         background: {WHITE} !important;
-        box-shadow: 0 6px 20px rgba(30, 36, 48, 0.08) !important;
+        box-shadow: 0 6px 20px rgba(240, 138, 36, 0.18) !important;
     }}
     div[data-testid="stSelectbox"], div[data-testid="stTextInput"], div[data-testid="stNumberInput"] {{
         background: transparent;
@@ -220,15 +223,15 @@ def inject_styles() -> None:
     }}
     .stTextInput input:focus,
     .stNumberInput input:focus {{
-        border-color: {ACCENT_BLUE} !important;
-        box-shadow: 0 0 0 2px rgba(47, 109, 246, 0.13) !important;
+        border-color: {ORANGE} !important;
+        box-shadow: 0 0 0 2px rgba(240, 138, 36, 0.18) !important;
     }}
     [data-testid="stMetric"] {{
         background: {CARD_BG};
         border: 1px solid {CARD_BORDER};
         border-radius: 14px;
         padding: 8px 10px;
-        box-shadow: 0 6px 18px rgba(28, 40, 64, 0.06);
+        box-shadow: 0 8px 20px rgba(240, 138, 36, 0.08);
     }}
     [data-testid="stMetricLabel"] {{
         color: {MUTED} !important;
@@ -250,8 +253,8 @@ def inject_styles() -> None:
         transition: all .14s ease-in-out !important;
     }}
     div[data-testid="stHorizontalBlock"] button:hover {{
-        border-color: {ACCENT_BLUE} !important;
-        box-shadow: 0 8px 16px rgba(47,109,246,0.15) !important;
+        border-color: {ORANGE} !important;
+        box-shadow: 0 8px 16px rgba(240,138,36,0.2) !important;
         transform: translateY(-1px);
     }}
     .sn-big-btn > button {{
@@ -268,8 +271,8 @@ def inject_styles() -> None:
         border: 0 !important;
         color: #fff !important;
         font-weight: 700 !important;
-        background: linear-gradient(135deg, {ACCENT_BLUE}, #5f89f8) !important;
-        box-shadow: 0 8px 18px rgba(47,109,246,0.28) !important;
+        background: linear-gradient(135deg, {ORANGE}, #f4aa4f) !important;
+        box-shadow: 0 8px 18px rgba(240,138,36,0.3) !important;
     }}
     .stButton > button[kind="primary"]:hover, .stDownloadButton > button:hover {{
         filter: brightness(1.04);
@@ -301,34 +304,34 @@ def inject_styles() -> None:
         margin: 0;
     }}
     [data-testid="stSidebar"] {{
-        background: linear-gradient(180deg, #1c2432 0%, #253249 40%, #f7f8fc 40.2%, #fdfefe 100%);
+        background: linear-gradient(180deg, #fff7ef, #fffefc);
         border-right: 1px solid #e8ecf3;
     }}
     [data-testid="stSidebar"] * {{
-        color: #f4f7ff;
+        color: {TEXT};
     }}
     [data-testid="stSidebar"] .stTextInput label,
     [data-testid="stSidebar"] h1,
     [data-testid="stSidebar"] h2,
     [data-testid="stSidebar"] h3,
     [data-testid="stSidebar"] p {{
-        color: #f4f7ff !important;
+        color: {TEXT} !important;
     }}
     [data-testid="stSidebar"] div[data-baseweb="select"] > div,
     [data-testid="stSidebar"] .stTextInput input {{
-        background: rgba(255,255,255,0.95) !important;
-        color: #1d2433 !important;
+        background: #fff !important;
+        color: {TEXT} !important;
     }}
     [data-testid="stSidebar"] .block-container {{
         padding-top: 1rem;
     }}
     .sn-hero {{
-        background: linear-gradient(122deg, #ffffff, #f8fbff);
+        background: linear-gradient(122deg, #ffffff, {ORANGE_LIGHT});
         border: 1px solid {CARD_BORDER};
         border-radius: 18px;
         padding: 14px 16px;
         margin: 8px 0 16px 0;
-        box-shadow: 0 12px 24px rgba(33, 44, 68, 0.08);
+        box-shadow: 0 12px 24px rgba(240, 138, 36, 0.12);
     }}
     .sn-hero-title {{
         font-size: 1.08rem;
@@ -343,13 +346,13 @@ def inject_styles() -> None:
     }}
     .sn-chip {{
         display: inline-block;
-        background: {ACCENT_BLUE_SOFT};
-        border: 1px solid #cddaff;
+        background: {ORANGE_SOFT};
+        border: 1px solid #f6c998;
         border-radius: 999px;
         padding: 4px 10px;
         margin-right: 6px;
         margin-top: 6px;
-        color: #355ac6;
+        color: #a85a11;
         font-size: 0.8rem;
         font-weight: 700;
     }}
@@ -359,7 +362,7 @@ def inject_styles() -> None:
         border-radius: 16px;
         padding: 12px 14px;
         margin-bottom: 12px;
-        box-shadow: 0 8px 18px rgba(29, 41, 65, 0.06);
+        box-shadow: 0 8px 18px rgba(240, 138, 36, 0.1);
     }}
     .sn-panel-title {{
         font-family: 'Manrope', sans-serif;
@@ -625,10 +628,6 @@ def run_splash_sequence() -> None:
                             f"<h1 style='text-align:center;color:{GOLD};'>SUPERNOVA</h1>",
                             unsafe_allow_html=True,
                         )
-                    st.markdown(
-                        f"<p style='text-align:center;color:{MUTED};'>Range Data Suite</p>",
-                        unsafe_allow_html=True,
-                    )
                 else:
                     st.markdown(
                         f"<h2 style='text-align:center;color:{GOLD_DARK};margin-top:4rem;'>{msg}</h2>",
@@ -1605,3 +1604,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
