@@ -664,11 +664,29 @@ def login_screen() -> None:
         if pwd_ok:
             st.session_state["logged_in"] = True
             st.session_state["user"] = u.upper()
+            st.session_state["post_auth_logo_pending"] = True
             st.rerun()
         else:
             st.error("Credenziali non valide.")
     brand_footer()
     st.stop()
+
+
+def run_post_auth_logo() -> None:
+    holder = st.empty()
+    with holder.container():
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns([1, 3, 1])
+        with c2:
+            try:
+                st.image("logo.png", use_container_width=True)
+            except Exception:
+                st.markdown(
+                    f"<h1 style='text-align:center;color:{GOLD};'>SUPERNOVA</h1>",
+                    unsafe_allow_html=True,
+                )
+    time.sleep(2.0)
+    holder.empty()
 
 
 # =============================================================================
@@ -1452,6 +1470,82 @@ def review_panel(user: str, session_name: str) -> None:
     sg_series = pd.to_numeric(dsec["Strokes_Gained"], errors="coerce").dropna()
     m3.metric("SG medio", f"{sg_series.mean():+.3f}" if len(sg_series) else "—")
 
+    st.markdown("#### Tabelle schematiche di review")
+    shots_cols = [
+        "Date",
+        "Time",
+        "SessionName",
+        "Category",
+        "Club",
+        "Impact",
+        "Curvature",
+        "Trajectory",
+        "Direction_LR",
+        "Proximity_Lateral_m",
+        "Proximity_Depth_m",
+        "Rating",
+        "Strokes_Gained",
+    ]
+    shots_table = (
+        dsec[[c for c in shots_cols if c in dsec.columns]]
+        .sort_values(by=["Date", "Time"], ascending=False)
+        .reset_index(drop=True)
+    )
+    st.caption("Dettaglio colpo per colpo (settore selezionato).")
+    st.dataframe(shots_table, use_container_width=True, hide_index=True)
+
+    avg_by_cat = (
+        df_f.groupby("Category", dropna=False)
+        .agg(
+            Colpi=("Rating", "count"),
+            Media_Voto=("Rating", "mean"),
+            Media_SG=("Strokes_Gained", "mean"),
+        )
+        .reset_index()
+    )
+    avg_by_cat["Category"] = avg_by_cat["Category"].map(CATEGORIES).fillna(avg_by_cat["Category"])
+    avg_by_cat["Media_Voto"] = pd.to_numeric(avg_by_cat["Media_Voto"], errors="coerce").round(2)
+    avg_by_cat["Media_SG"] = pd.to_numeric(avg_by_cat["Media_SG"], errors="coerce").round(3)
+    st.caption("Medie per area (periodo selezionato).")
+    st.dataframe(avg_by_cat, use_container_width=True, hide_index=True)
+
+    avg_by_club = (
+        dsec.groupby("Club", dropna=False)
+        .agg(
+            Colpi=("Rating", "count"),
+            Media_Voto=("Rating", "mean"),
+            Media_SG=("Strokes_Gained", "mean"),
+        )
+        .reset_index()
+        .sort_values(by=["Colpi", "Club"], ascending=[False, True])
+    )
+    avg_by_club["Media_Voto"] = pd.to_numeric(avg_by_club["Media_Voto"], errors="coerce").round(2)
+    avg_by_club["Media_SG"] = pd.to_numeric(avg_by_club["Media_SG"], errors="coerce").round(3)
+    st.caption("Medie per colpo/bastone nel settore selezionato.")
+    st.dataframe(avg_by_club, use_container_width=True, hide_index=True)
+
+    no_short = df_f[df_f["Category"] != "SHORT"]
+    comp_avg = pd.DataFrame(
+        [
+            {
+                "Vista media": "Con SG inclusi (tutte le categorie)",
+                "Colpi": len(df_f),
+                "Media Voto": pd.to_numeric(df_f["Rating"], errors="coerce").mean(),
+                "Media SG": pd.to_numeric(df_f["Strokes_Gained"], errors="coerce").mean(),
+            },
+            {
+                "Vista media": "Con SG esclusi (senza SHORT)",
+                "Colpi": len(no_short),
+                "Media Voto": pd.to_numeric(no_short["Rating"], errors="coerce").mean(),
+                "Media SG": pd.to_numeric(no_short["Strokes_Gained"], errors="coerce").mean(),
+            },
+        ]
+    )
+    comp_avg["Media Voto"] = pd.to_numeric(comp_avg["Media Voto"], errors="coerce").round(2)
+    comp_avg["Media SG"] = pd.to_numeric(comp_avg["Media SG"], errors="coerce").round(3)
+    st.caption("Confronto medie SG inclusi / non inclusi.")
+    st.dataframe(comp_avg, use_container_width=True, hide_index=True)
+
     sg_summary_table(df_f, sector)
     trend_panel(dsec, CATEGORIES[sector])
     club_breakdown_table(dsec)
@@ -1523,36 +1617,37 @@ def main() -> None:
 
     if "logged_in" not in st.session_state:
         st.session_state["logged_in"] = False
+    if "post_auth_logo_pending" not in st.session_state:
+        st.session_state["post_auth_logo_pending"] = False
 
     if not st.session_state["logged_in"]:
         login_screen()
         return
 
     user = str(st.session_state["user"])
+    if st.session_state.get("post_auth_logo_pending", False):
+        run_post_auth_logo()
+        st.session_state["post_auth_logo_pending"] = False
+        st.rerun()
 
-    with st.sidebar:
-        brand_header("Profilo")
-        render_panel(
-            "Navigazione",
-            "Passa tra raccolta dati e review analytics. La scelta e' sempre disponibile qui.",
-        )
-        st.write(f"**Atleta:** {user}")
-        st.markdown("### Sezione")
-        page = st.selectbox(
-            "Apri sezione",
-            ["Inserimento dati", "Review"],
-            index=0,
-            key="main_page_sidebar",
-            label_visibility="collapsed",
-        )
-        session_name = st.text_input("Nome sessione / note", value="Sessione Allenamento")
-        st.divider()
-        render_panel(
-            "Sessione attiva",
-            "Il nome sessione viene usato nel filtro 'Sessione corrente' in Review.",
-        )
+    brand_header("Profilo")
+    st.write(f"**Atleta:** {user}")
+    session_name = st.text_input(
+        "Nome sessione / note",
+        value=st.session_state.get("session_name_main", "Sessione Allenamento"),
+        key="session_name_main",
+    )
+    page = st.radio(
+        "Scegli sezione",
+        ["Inserimento dati", "Review"],
+        horizontal=True,
+        key="main_page_home",
+    )
+    c_logout_1, c_logout_2 = st.columns([3, 1])
+    with c_logout_2:
         if st.button("Logout / cambia utente", use_container_width=True):
             st.session_state["logged_in"] = False
+            st.session_state["post_auth_logo_pending"] = False
             st.session_state.pop("user", None)
             st.rerun()
 
@@ -1604,4 +1699,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
 
