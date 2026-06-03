@@ -1,6 +1,6 @@
 streamlit
 pandas
-plotly
 numpy
-st-gsheets-connection
-
+plotly
+streamlit-gsheets-connection
+reportlab
