@@ -1,13 +1,16 @@
 """
 Zanardelli Range Suite — tracking allenamento (range, gioco corto, putting).
-UI mobile-first, persistenza Google Sheets, export Diario di Gioco (PDF).
+UI mobile-first, persistenza Google Sheets, export Diario di Gioco (HTML/PDF).
 """
 
 from __future__ import annotations
 
+import base64
 import datetime
+import html
 import io
 import time
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -728,6 +731,150 @@ def club_summary_for_diario(df: pd.DataFrame) -> tuple[list[str], list[list[str]
     return header, rows
 
 
+def _diario_meta(df_session: pd.DataFrame, user: str, session_name: str) -> dict[str, str]:
+    now = datetime.datetime.now()
+    times = df_session["Time"].dropna().astype(str).tolist() if not df_session.empty else []
+    t_range = f"{times[0]} – {times[-1]}" if len(times) >= 2 else (times[0] if times else now.strftime("%H:%M"))
+    cats = df_session["Category"].dropna().unique().tolist() if not df_session.empty else []
+    cat_txt = ", ".join(CATEGORIES.get(c, c) for c in cats) if cats else "—"
+    return {
+        "atleta": user,
+        "sessione": session_name,
+        "data": datetime.date.today().strftime("%d/%m/%Y"),
+        "ora": t_range,
+        "settori": cat_txt,
+        "colpi": str(len(df_session)),
+        "generato": now.strftime("%d/%m/%Y %H:%M"),
+    }
+
+
+def _logo_data_uri() -> str:
+    path = Path("logo.png")
+    if not path.is_file():
+        return ""
+    try:
+        raw = path.read_bytes()
+        b64 = base64.b64encode(raw).decode("ascii")
+        return f"data:image/png;base64,{b64}"
+    except Exception:
+        return ""
+
+
+def build_diario_html(
+    df_session: pd.DataFrame,
+    user: str,
+    session_name: str,
+) -> str:
+    """Diario stampabile: zero dipendenze extra, funziona su qualsiasi deploy Streamlit."""
+    meta = _diario_meta(df_session, user, session_name)
+    header, rows = club_summary_for_diario(df_session)
+    logo_uri = _logo_data_uri()
+    logo_block = (
+        f'<img src="{logo_uri}" alt="Logo" class="logo" />'
+        if logo_uri
+        else f'<div class="logo-fallback">{html.escape(APP_NAME)}</div>'
+    )
+
+    table_html = ""
+    if header:
+        thead = "".join(f"<th>{html.escape(c)}</th>" for c in header)
+        body_rows = []
+        for r in rows:
+            cells = "".join(f"<td>{html.escape(str(c))}</td>" for c in r)
+            body_rows.append(f"<tr>{cells}</tr>")
+        table_html = (
+            "<table class='stats'>"
+            f"<thead><tr>{thead}</tr></thead>"
+            f"<tbody>{''.join(body_rows)}</tbody>"
+            "</table>"
+        )
+    else:
+        table_html = "<p class='muted'>Nessun colpo in questa sessione.</p>"
+
+    return f"""<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8"/>
+<title>Diario di Gioco — {html.escape(user)}</title>
+<style>
+  @page {{ margin: 1.5cm; }}
+  body {{
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: {BLACK};
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px;
+    background: {WHITE};
+  }}
+  .header {{ display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; }}
+  .logo {{ max-height: 72px; max-width: 120px; }}
+  .logo-fallback {{ font-weight: 800; color: {OCHRE}; font-size: 1.1rem; }}
+  h1 {{ margin: 0 0 4px 0; font-size: 1.5rem; }}
+  .app {{ color: {MUTED}; margin: 0; font-size: 0.95rem; }}
+  .meta {{ width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.9rem; }}
+  .meta td {{ padding: 6px 10px; border-bottom: 1px solid {CARD_BORDER}; }}
+  .meta td:first-child {{ font-weight: 700; width: 180px; color: {BLACK}; }}
+  h2 {{ font-size: 1.1rem; border-left: 4px solid {ORANGE}; padding-left: 10px; }}
+  table.stats {{
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }}
+  table.stats th {{
+    background: {ORANGE};
+    color: {WHITE};
+    padding: 8px 6px;
+    text-align: center;
+  }}
+  table.stats td {{
+    padding: 7px 6px;
+    border: 1px solid {CARD_BORDER};
+    text-align: center;
+  }}
+  table.stats td:first-child {{ text-align: left; font-weight: 600; }}
+  table.stats tbody tr:nth-child(even) {{ background: {OFF_WHITE}; }}
+  .note, .muted {{ color: {MUTED}; font-size: 0.85rem; }}
+  .footer {{
+    margin-top: 32px;
+    padding-top: 12px;
+    border-top: 1px solid {CARD_BORDER};
+    font-size: 0.8rem;
+    color: {MUTED};
+    text-align: center;
+  }}
+  @media print {{
+    body {{ padding: 0; }}
+    .no-print {{ display: none; }}
+  }}
+</style>
+</head>
+<body>
+<div class="header">
+  {logo_block}
+  <div>
+    <h1>Diario di Gioco</h1>
+    <p class="app">{html.escape(APP_NAME)}</p>
+  </div>
+</div>
+<table class="meta">
+  <tr><td>Atleta</td><td>{html.escape(meta['atleta'])}</td></tr>
+  <tr><td>Sessione</td><td>{html.escape(meta['sessione'])}</td></tr>
+  <tr><td>Data</td><td>{html.escape(meta['data'])}</td></tr>
+  <tr><td>Ora / intervallo</td><td>{html.escape(meta['ora'])}</td></tr>
+  <tr><td>Settori</td><td>{html.escape(meta['settori'])}</td></tr>
+  <tr><td>Colpi totali</td><td>{html.escape(meta['colpi'])}</td></tr>
+  <tr><td>Generato il</td><td>{html.escape(meta['generato'])}</td></tr>
+</table>
+<h2>Statistiche medie per bastone</h2>
+<p class="note">Medie sui colpi della sessione corrente — una colonna per ogni bastone utilizzato.</p>
+{table_html}
+<p class="no-print note">Per ottenere un PDF: apri questo file nel browser e usa Stampa → Salva come PDF.</p>
+<div class="footer">© Andrea Zanardelli · Co-designed by Andrea Zanardelli and Edoardo Venturoli</div>
+</body>
+</html>"""
+
+
 def build_diario_pdf(
     df_session: pd.DataFrame,
     user: str,
@@ -771,20 +918,15 @@ def build_diario_pdf(
     story.append(Paragraph("Diario di Gioco", title_style))
     story.append(Paragraph(f"<b>{APP_NAME}</b>", sub_style))
 
-    now = datetime.datetime.now()
-    times = df_session["Time"].dropna().astype(str).tolist() if not df_session.empty else []
-    t_range = f"{times[0]} – {times[-1]}" if len(times) >= 2 else (times[0] if times else now.strftime("%H:%M"))
-    cats = df_session["Category"].dropna().unique().tolist() if not df_session.empty else []
-    cat_txt = ", ".join(CATEGORIES.get(c, c) for c in cats) if cats else "—"
-
+    meta_dict = _diario_meta(df_session, user, session_name)
     meta = [
-        ["Atleta", user],
-        ["Sessione", session_name],
-        ["Data", str(datetime.date.today().strftime("%d/%m/%Y"))],
-        ["Ora / intervallo", t_range],
-        ["Settori", cat_txt],
-        ["Colpi totali sessione", str(len(df_session))],
-        ["Generato il", now.strftime("%d/%m/%Y %H:%M")],
+        ["Atleta", meta_dict["atleta"]],
+        ["Sessione", meta_dict["sessione"]],
+        ["Data", meta_dict["data"]],
+        ["Ora / intervallo", meta_dict["ora"]],
+        ["Settori", meta_dict["settori"]],
+        ["Colpi totali sessione", meta_dict["colpi"]],
+        ["Generato il", meta_dict["generato"]],
     ]
     meta_table = Table(meta, colWidths=[4.5 * cm, 12 * cm])
     meta_table.setStyle(
@@ -847,7 +989,7 @@ def build_diario_pdf(
 def diario_panel(user: str, session_name: str) -> None:
     render_hero(
         "Diario di Gioco",
-        "PDF tabellare con medie per bastone della sessione in corso. Nessun dato extra: usa i colpi già salvati.",
+        "Scarica il report in PDF con un click. Gli atleti usano solo il browser — il PDF è generato dal server.",
         ["PDF", "Medie per bastone", "Sessione live"],
     )
     df_all = load_data()
@@ -878,20 +1020,45 @@ def diario_panel(user: str, session_name: str) -> None:
         st.markdown("#### Medie per bastone (anteprima)")
         st.dataframe(pd.DataFrame(rows, columns=header), use_container_width=True, hide_index=True)
 
+    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in session_name)[:40]
+    file_stub = f"Diario_Gioco_{user}_{safe_name}_{datetime.date.today():%Y%m%d}"
+
     if not HAS_REPORTLAB:
-        st.warning("Installa `reportlab` per esportare il PDF: `pip install reportlab`")
+        st.error(
+            "Il modulo **reportlab** non è installato sul server che esegue l'app. "
+            "Chi gestisce il deploy deve eseguire una sola volta: "
+            "`pip install -r requirements.txt` (oppure rideploy su Streamlit Cloud con il requirements aggiornato)."
+        )
+        st.download_button(
+            label="Scarica Diario (HTML — alternativa)",
+            data=build_diario_html(df_sess, user, session_name).encode("utf-8"),
+            file_name=f"{file_stub}.html",
+            mime="text/html",
+            use_container_width=True,
+        )
         brand_footer()
         return
 
     pdf_bytes = build_diario_pdf(df_sess, user, session_name)
-    if pdf_bytes:
-        safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in session_name)[:40]
+    if not pdf_bytes:
+        st.error("Errore nella generazione del PDF. Riprova tra qualche secondo.")
+        brand_footer()
+        return
+
+    st.download_button(
+        label="Scarica Diario di Gioco (PDF)",
+        data=pdf_bytes,
+        file_name=f"{file_stub}.pdf",
+        mime="application/pdf",
+        type="primary",
+        use_container_width=True,
+    )
+    with st.expander("Alternativa: scarica HTML (stampa come PDF dal browser)"):
         st.download_button(
-            label="Scarica Diario di Gioco (PDF)",
-            data=pdf_bytes,
-            file_name=f"Diario_Gioco_{user}_{safe_name}_{datetime.date.today():%Y%m%d}.pdf",
-            mime="application/pdf",
-            type="primary",
+            label="Scarica versione HTML",
+            data=build_diario_html(df_sess, user, session_name).encode("utf-8"),
+            file_name=f"{file_stub}.html",
+            mime="text/html",
             use_container_width=True,
         )
     brand_footer()
