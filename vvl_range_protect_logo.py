@@ -39,7 +39,7 @@ st.markdown(f"""
     .stApp {{background: linear-gradient(180deg, #FFFFFF 0%, #FFFBEF 75%, #F8EFCF 100%);}}
     </style>
     """, unsafe_allow_html=True)
-    
+
 
 GOLD = "#C9A227"
 GOLD_LIGHT = "#E8D48A"
@@ -688,8 +688,6 @@ def run_post_auth_logo() -> None:
                 )
     time.sleep(2.0)
     holder.empty()
-
-
 # =============================================================================
 # Helpers UI wizard
 # =============================================================================
@@ -1494,7 +1492,6 @@ def review_panel(user: str, session_name: str) -> None:
     )
     st.caption("Dettaglio colpo per colpo (settore selezionato).")
     st.dataframe(shots_table, use_container_width=True, hide_index=True)
-
     avg_by_cat = (
         df_f.groupby("Category", dropna=False)
         .agg(
@@ -1509,7 +1506,6 @@ def review_panel(user: str, session_name: str) -> None:
     avg_by_cat["Media_SG"] = pd.to_numeric(avg_by_cat["Media_SG"], errors="coerce").round(3)
     st.caption("Medie per area (periodo selezionato).")
     st.dataframe(avg_by_cat, use_container_width=True, hide_index=True)
-
     avg_by_club = (
         dsec.groupby("Club", dropna=False)
         .agg(
@@ -1524,7 +1520,6 @@ def review_panel(user: str, session_name: str) -> None:
     avg_by_club["Media_SG"] = pd.to_numeric(avg_by_club["Media_SG"], errors="coerce").round(3)
     st.caption("Medie per colpo/bastone nel settore selezionato.")
     st.dataframe(avg_by_club, use_container_width=True, hide_index=True)
-
     no_short = df_f[df_f["Category"] != "SHORT"]
     comp_avg = pd.DataFrame(
         [
@@ -1546,7 +1541,6 @@ def review_panel(user: str, session_name: str) -> None:
     comp_avg["Media SG"] = pd.to_numeric(comp_avg["Media SG"], errors="coerce").round(3)
     st.caption("Confronto medie SG inclusi / non inclusi.")
     st.dataframe(comp_avg, use_container_width=True, hide_index=True)
-
     sg_summary_table(df_f, sector)
     trend_panel(dsec, CATEGORIES[sector])
     club_breakdown_table(dsec)
@@ -1631,6 +1625,27 @@ def main() -> None:
         st.session_state["post_auth_logo_pending"] = False
         st.rerun()
 
+    with st.sidebar:
+        brand_header("Profilo")
+        render_panel(
+            "Navigazione",
+            "Passa tra raccolta dati e review analytics. La scelta e' sempre disponibile qui.",
+        )
+        st.write(f"**Atleta:** {user}")
+        st.markdown("### Sezione")
+        page = st.selectbox(
+            "Apri sezione",
+            ["Inserimento dati", "Review"],
+            index=0,
+            key="main_page_sidebar",
+            label_visibility="collapsed",
+        )
+        session_name = st.text_input("Nome sessione / note", value="Sessione Allenamento")
+        st.divider()
+        render_panel(
+            "Sessione attiva",
+            "Il nome sessione viene usato nel filtro 'Sessione corrente' in Review.",
+        )
     brand_header("Profilo")
     st.write(f"**Atleta:** {user}")
     session_name = st.text_input(
