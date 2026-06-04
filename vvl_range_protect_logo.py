@@ -1,16 +1,14 @@
 """
 Zanardelli Range Suite — tracking allenamento (range, gioco corto, putting).
-UI mobile-first, persistenza Google Sheets, export Diario di Gioco (HTML/PDF).
+UI mobile-first, persistenza Google Sheets, export Diario di Gioco (PDF).
 """
 
 from __future__ import annotations
 
-import base64
 import datetime
-import html
+import html as html_lib
 import io
 import time
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -40,7 +38,6 @@ except ImportError:
 # Config pagina
 # =============================================================================
 APP_NAME = "Zanardelli Range Suite"
-APP_TAGLINE = "Range Data Suite · Data over talent"
 
 st.set_page_config(
     page_title=APP_NAME,
@@ -49,35 +46,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-st.markdown(
-    """
+st.markdown(f"""
     <style>
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    .stDeployButton {display:none;}
-    [data-testid="stToolbar"] {visibility: hidden !important;}
+    #MainMenu {{visibility: hidden;}} footer {{visibility: hidden;}} header {{visibility: hidden;}}
+    .stDeployButton {{display:none;}}
+    [data-testid="stToolbar"] {{visibility: hidden !important;}}
+    .stApp {{background: linear-gradient(180deg, #FFFFFF 0%, #FFFBEF 75%, #F8EFCF 100%);}}
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+    """, unsafe_allow_html=True)
+    
 
-# Brand palette — arancione, nero, bianco, ocra
-BLACK = "#141414"
-BLACK_SOFT = "#2A2A2A"
+GOLD = "#C9A227"
+GOLD_LIGHT = "#E8D48A"
+GOLD_DARK = "#7A5B12"
 WHITE = "#FFFFFF"
-OFF_WHITE = "#FFFCF7"
-OCHRE = "#C9A227"
-OCHRE_LIGHT = "#E8D48A"
-OCHRE_DARK = "#7A5B12"
+OFF_WHITE = "#FFF9F2"
+TEXT = "#403022"
+MUTED = "#8A6F55"
+ACCENT_BLUE = "#5A8DEE"
+ACCENT_BLUE_SOFT = "#EEF4FF"
+SUCCESS_GREEN = "#17A673"
+CARD_BG = "#FFFFFF"
+CARD_BORDER = "#F1DCC7"
 ORANGE = "#F08A24"
-ORANGE_DEEP = "#D96E0A"
 ORANGE_SOFT = "#FFE7CF"
 ORANGE_LIGHT = "#FFF1E3"
-TEXT = "#1A1A1A"
-MUTED = "#6B5B4A"
-CARD_BG = "#FFFFFF"
-CARD_BORDER = "#E8D4B8"
-ACCENT_BLUE = "#3D6BB5"
-SUCCESS_GREEN = "#17A673"
 
 PASSWORD_DEFAULT = "supernova.analytics"
 
@@ -87,6 +80,7 @@ CATEGORIES = {
     "PUTT": "Putting",
 }
 
+# Schema colonne foglio (ordine stabile per concat/update)
 DATA_COLUMNS = [
     "User",
     "Date",
@@ -152,8 +146,23 @@ MENTAL_OPTIONS = [
 ]
 
 CLUBS_LONG = [
-    "DR", "3W", "5W", "7W", "3H", "3i", "4i", "5i", "6i", "7i",
-    "8i", "9i", "PW", "AW", "GW", "SW", "LW",
+    "DR",
+    "3W",
+    "5W",
+    "7W",
+    "3H",
+    "3i",
+    "4i",
+    "5i",
+    "6i",
+    "7i",
+    "8i",
+    "9i",
+    "PW",
+    "AW",
+    "GW",
+    "SW",
+    "LW",
 ]
 CLUBS_SHORT = ["LW", "SW", "GW", "AW", "PW", "9i", "8i", "7i"]
 
@@ -178,217 +187,221 @@ NUMERIC_AVG_FIELDS = [
 ]
 
 
-# =============================================================================
-# Stili UI (look desktop/Java: card nette, ombre, tipografia pulita)
-# =============================================================================
 def inject_styles() -> None:
     st.markdown(
         f"""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Sans:wght@500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap');
     #MainMenu {{visibility: hidden; height: 0;}}
     footer {{visibility: hidden; height: 0;}}
     header [data-testid="stHeader"] {{background: transparent;}}
     html, body, [class*="css"] {{
-        font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
+        font-family: 'Inter', sans-serif;
         color: {TEXT};
     }}
     .stApp {{
         background:
-            radial-gradient(ellipse 90% 40% at 100% 0%, {ORANGE_SOFT} 0%, transparent 55%),
-            radial-gradient(ellipse 70% 35% at 0% 0%, {OCHRE_LIGHT}33 0%, transparent 50%),
-            linear-gradient(180deg, {OFF_WHITE} 0%, {WHITE} 45%, #FAF6EF 100%);
+            radial-gradient(circle at 85% 8%, #ffe2c4 0%, rgba(255,226,196,0.0) 30%),
+            radial-gradient(circle at 10% -5%, #f7ebc8 0%, rgba(247,235,200,0.0) 32%),
+            linear-gradient(180deg, #fff6ed 0%, #ffffff 52%);
+        color: {TEXT};
     }}
     .block-container {{
-        padding-top: 0.6rem;
-        padding-bottom: 5rem;
-        max-width: 920px;
+        padding-top: 0.75rem;
+        padding-bottom: 4rem;
+        max-width: 860px;
     }}
     h1, h2, h3 {{
-        color: {BLACK};
-        font-family: 'IBM Plex Sans', sans-serif;
-        font-weight: 700;
-        letter-spacing: -0.02em;
+        color: {TEXT};
+        font-family: 'Manrope', sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.01em;
+    }}
+    h3 {{
+        margin-top: 0.25rem;
+    }}
+    p, span, label {{
+        color: {TEXT};
     }}
     [data-testid="stTabs"] button[role="tab"] {{
-        font-size: 1rem !important;
+        font-size: 0.98rem !important;
         font-weight: 700 !important;
-        border-radius: 10px 10px 0 0 !important;
+        border-radius: 12px !important;
         color: {MUTED} !important;
         border: 1px solid transparent !important;
-        padding: 10px 18px !important;
+        background: transparent !important;
     }}
     [data-testid="stTabs"] button[aria-selected="true"] {{
-        color: {BLACK} !important;
-        border-color: {CARD_BORDER} !important;
-        border-bottom-color: {WHITE} !important;
+        color: {TEXT} !important;
+        border-color: #efc79e !important;
         background: {WHITE} !important;
-        box-shadow: 0 -2px 12px rgba(20,20,20,0.06) !important;
+        box-shadow: 0 6px 20px rgba(240, 138, 36, 0.18) !important;
+    }}
+    div[data-testid="stSelectbox"], div[data-testid="stTextInput"], div[data-testid="stNumberInput"] {{
+        background: transparent;
     }}
     div[data-baseweb="select"] > div,
     .stTextInput input,
     .stNumberInput input {{
-        border-radius: 10px !important;
-        border: 1.5px solid #D4C4B0 !important;
-        background: {WHITE} !important;
-        min-height: 3.1rem !important;
-        font-size: 1.05rem !important;
-        box-shadow: inset 0 1px 2px rgba(20,20,20,0.04) !important;
+        border-radius: 12px !important;
+        border: 1px solid #d9dee8 !important;
+        background: #fff !important;
+        min-height: 2.7rem !important;
     }}
     .stTextInput input:focus,
     .stNumberInput input:focus {{
         border-color: {ORANGE} !important;
-        box-shadow: 0 0 0 3px rgba(240, 138, 36, 0.22) !important;
+        box-shadow: 0 0 0 2px rgba(240, 138, 36, 0.18) !important;
     }}
     [data-testid="stMetric"] {{
         background: {CARD_BG};
-        border: 1.5px solid {CARD_BORDER};
-        border-radius: 12px;
-        padding: 10px 12px;
-        box-shadow: 0 4px 14px rgba(20,20,20,0.07);
+        border: 1px solid {CARD_BORDER};
+        border-radius: 14px;
+        padding: 8px 10px;
+        box-shadow: 0 8px 20px rgba(240, 138, 36, 0.08);
     }}
     [data-testid="stMetricLabel"] {{
         color: {MUTED} !important;
         font-weight: 600 !important;
-        font-size: 0.82rem !important;
     }}
     [data-testid="stMetricValue"] {{
-        color: {BLACK} !important;
-        font-family: 'IBM Plex Sans', sans-serif !important;
-        font-weight: 700 !important;
+        color: {TEXT} !important;
+        font-family: 'Manrope', sans-serif !important;
+        font-weight: 800 !important;
     }}
-    .stButton > button,
-    .stDownloadButton > button {{
-        border-radius: 12px !important;
-        font-weight: 700 !important;
-        transition: transform 0.12s ease, box-shadow 0.12s ease !important;
-    }}
-    div[data-testid="stHorizontalBlock"] > div .stButton > button {{
-        min-height: 4.1rem !important;
-        font-size: 1.08rem !important;
+    div[data-testid="stHorizontalBlock"] button {{
+        min-height: 3.65rem !important;
+        font-size: 1.06rem !important;
         border-radius: 14px !important;
-        border: 1.5px solid #D8D0C4 !important;
-        background: linear-gradient(180deg, {WHITE} 0%, #FAF8F4 100%) !important;
-        color: {BLACK} !important;
-        box-shadow: 0 2px 0 #E8E0D4, 0 6px 16px rgba(20,20,20,0.06) !important;
+        border: 1px solid #d7ddeb !important;
+        background: {WHITE} !important;
+        color: {TEXT} !important;
+        font-weight: 700 !important;
+        transition: all .14s ease-in-out !important;
     }}
-    div[data-testid="stHorizontalBlock"] > div .stButton > button:hover {{
+    div[data-testid="stHorizontalBlock"] button:hover {{
         border-color: {ORANGE} !important;
-        color: {ORANGE_DEEP} !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 0 #E8E0D4, 0 10px 22px rgba(240,138,36,0.22) !important;
+        box-shadow: 0 8px 16px rgba(240,138,36,0.2) !important;
+        transform: translateY(-1px);
     }}
-    .stButton > button[kind="primary"],
-    .stDownloadButton > button {{
-        min-height: 3.5rem !important;
+    .sn-big-btn > button {{
+        width: 100%;
+        min-height: 3.5rem;
+        font-size: 1.05rem;
+        border-radius: 16px;
+        background: {WHITE};
+        border: 1px solid #d7ddeb;
+        font-weight: 700;
+    }}
+    .stButton > button[kind="primary"], .stDownloadButton > button {{
+        border-radius: 14px !important;
         border: 0 !important;
-        color: {WHITE} !important;
-        background: linear-gradient(180deg, {ORANGE} 0%, {ORANGE_DEEP} 100%) !important;
-        box-shadow: 0 3px 0 {OCHRE_DARK}, 0 10px 24px rgba(240,138,36,0.35) !important;
+        color: #fff !important;
+        font-weight: 700 !important;
+        background: linear-gradient(135deg, {ORANGE}, #f4aa4f) !important;
+        box-shadow: 0 8px 18px rgba(240,138,36,0.3) !important;
     }}
-    .stButton > button[kind="primary"]:active {{
-        transform: translateY(1px) !important;
-        box-shadow: 0 1px 0 {OCHRE_DARK}, 0 6px 14px rgba(240,138,36,0.28) !important;
-    }}
-    .zrs-preset-row .stButton > button {{
-        min-height: 3.35rem !important;
-        font-size: 1rem !important;
-        background: {ORANGE_LIGHT} !important;
-        border-color: #F0C89A !important;
-        color: {BLACK_SOFT} !important;
+    .stButton > button[kind="primary"]:hover, .stDownloadButton > button:hover {{
+        filter: brightness(1.04);
+        transform: translateY(-1px);
     }}
     .stRadio > div {{
         background: {CARD_BG};
-        border: 1.5px solid {CARD_BORDER};
-        border-radius: 12px;
-        padding: 10px 12px;
-        box-shadow: 0 4px 12px rgba(20,20,20,0.05);
+        border: 1px solid {CARD_BORDER};
+        border-radius: 14px;
+        padding: 8px 10px;
+        box-shadow: 0 4px 14px rgba(28,40,64,0.05);
     }}
-    .zrs-footer {{
+    .stCaption {{
+        color: {MUTED} !important;
+    }}
+    .sn-footer {{
         text-align: center;
         color: {MUTED};
-        font-size: 0.84rem;
-        margin-top: 2.2rem;
-        padding: 1rem 0.5rem;
-        border-top: 1.5px solid {CARD_BORDER};
-        line-height: 1.55;
+        font-size: 0.82rem;
+        margin-top: 2rem;
+        padding: 0.8rem;
+        border-top: 1px solid #e6eaf2;
     }}
-    .zrs-footer strong {{
-        color: {BLACK};
-    }}
-    .zrs-logo-caption {{
+    .sn-logo-caption {{
         font-style: italic;
         color: {MUTED};
         font-weight: 600;
-        font-size: 0.92rem;
+        font-size: 0.9rem;
         margin: 0;
     }}
-    .zrs-hero {{
-        background: linear-gradient(135deg, {WHITE} 0%, {ORANGE_LIGHT} 100%);
-        border: 1.5px solid {CARD_BORDER};
-        border-left: 5px solid {ORANGE};
-        border-radius: 14px;
-        padding: 16px 18px;
-        margin: 8px 0 18px 0;
-        box-shadow: 0 8px 24px rgba(20,20,20,0.08);
+    [data-testid="stSidebar"] {{
+        background: linear-gradient(180deg, #fff7ef, #fffefc);
+        border-right: 1px solid #e8ecf3;
     }}
-    .zrs-hero-title {{
-        font-family: 'IBM Plex Sans', sans-serif;
-        font-size: 1.12rem;
-        font-weight: 700;
-        color: {BLACK};
+    [data-testid="stSidebar"] * {{
+        color: {TEXT};
+    }}
+    [data-testid="stSidebar"] .stTextInput label,
+    [data-testid="stSidebar"] h1,
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] h3,
+    [data-testid="stSidebar"] p {{
+        color: {TEXT} !important;
+    }}
+    [data-testid="stSidebar"] div[data-baseweb="select"] > div,
+    [data-testid="stSidebar"] .stTextInput input {{
+        background: #fff !important;
+        color: {TEXT} !important;
+    }}
+    [data-testid="stSidebar"] .block-container {{
+        padding-top: 1rem;
+    }}
+    .sn-hero {{
+        background: linear-gradient(122deg, #ffffff, {ORANGE_LIGHT});
+        border: 1px solid {CARD_BORDER};
+        border-radius: 18px;
+        padding: 14px 16px;
+        margin: 8px 0 16px 0;
+        box-shadow: 0 12px 24px rgba(240, 138, 36, 0.12);
+    }}
+    .sn-hero-title {{
+        font-size: 1.08rem;
+        font-weight: 800;
+        color: {TEXT};
         margin-bottom: 4px;
     }}
-    .zrs-hero-sub {{
+    .sn-hero-sub {{
         color: {MUTED};
-        font-size: 0.92rem;
+        font-size: 0.9rem;
         margin: 0;
     }}
-    .zrs-chip {{
+    .sn-chip {{
         display: inline-block;
-        background: {BLACK};
-        color: {WHITE};
-        border-radius: 6px;
-        padding: 5px 11px;
+        background: {ORANGE_SOFT};
+        border: 1px solid #f6c998;
+        border-radius: 999px;
+        padding: 4px 10px;
         margin-right: 6px;
-        margin-top: 8px;
-        font-size: 0.78rem;
+        margin-top: 6px;
+        color: #a85a11;
+        font-size: 0.8rem;
         font-weight: 700;
-        letter-spacing: 0.02em;
     }}
-    .zrs-chip-alt {{
-        background: {OCHRE};
-        color: {BLACK};
-    }}
-    .zrs-panel {{
+    .sn-panel {{
         background: {CARD_BG};
-        border: 1.5px solid {CARD_BORDER};
-        border-radius: 14px;
-        padding: 14px 16px;
-        margin-bottom: 14px;
-        box-shadow: 0 6px 20px rgba(20,20,20,0.06);
+        border: 1px solid {CARD_BORDER};
+        border-radius: 16px;
+        padding: 12px 14px;
+        margin-bottom: 12px;
+        box-shadow: 0 8px 18px rgba(240, 138, 36, 0.1);
     }}
-    .zrs-panel-title {{
-        font-family: 'IBM Plex Sans', sans-serif;
-        font-size: 1rem;
-        color: {BLACK};
-        font-weight: 700;
+    .sn-panel-title {{
+        font-family: 'Manrope', sans-serif;
+        font-size: 0.98rem;
+        color: {TEXT};
+        font-weight: 800;
         margin-bottom: 2px;
     }}
-    .zrs-panel-sub {{
+    .sn-panel-sub {{
         color: {MUTED};
-        font-size: 0.88rem;
+        font-size: 0.86rem;
         margin: 0;
-    }}
-    .zrs-step-badge {{
-        display: inline-block;
-        background: {ORANGE};
-        color: {WHITE};
-        font-weight: 700;
-        font-size: 0.75rem;
-        padding: 4px 10px;
-        border-radius: 6px;
-        margin-bottom: 8px;
     }}
 </style>
 """,
@@ -403,14 +416,14 @@ def brand_header(title: str | None = None) -> None:
             st.image("logo.png", use_container_width=True)
         except Exception:
             st.markdown(
-                f"<div style='font-size:1.5rem;font-weight:800;color:{OCHRE};'>{APP_NAME}</div>",
+                f"<div style='font-size:1.6rem;font-weight:800;color:{GOLD};'>{APP_NAME}</div>",
                 unsafe_allow_html=True,
             )
     with c2:
         if title:
             st.markdown(f"### {title}")
         st.markdown(
-            f"<p class='zrs-logo-caption'>{APP_TAGLINE}</p>",
+            "<p class='sn-logo-caption'>Range Data Suite · Data over talent</p>",
             unsafe_allow_html=True,
         )
 
@@ -418,7 +431,7 @@ def brand_header(title: str | None = None) -> None:
 def brand_footer() -> None:
     st.markdown(
         (
-            "<div class='zrs-footer'>"
+            "<div class='sn-footer'>"
             f"<strong>© {datetime.date.today().year} Andrea Zanardelli</strong><br>"
             "Co-designed by Andrea Zanardelli and Edoardo Venturoli"
             "</div>"
@@ -430,14 +443,12 @@ def brand_footer() -> None:
 def render_hero(title: str, subtitle: str, chips: list[str] | None = None) -> None:
     chips_html = ""
     if chips:
-        for i, c in enumerate(chips):
-            cls = "zrs-chip zrs-chip-alt" if i % 2 else "zrs-chip"
-            chips_html += f"<span class='{cls}'>{c}</span>"
+        chips_html = "".join([f"<span class='sn-chip'>{c}</span>" for c in chips])
     st.markdown(
         (
-            "<div class='zrs-hero'>"
-            f"<div class='zrs-hero-title'>{title}</div>"
-            f"<p class='zrs-hero-sub'>{subtitle}</p>"
+            "<div class='sn-hero'>"
+            f"<div class='sn-hero-title'>{title}</div>"
+            f"<p class='sn-hero-sub'>{subtitle}</p>"
             f"{chips_html}"
             "</div>"
         ),
@@ -448,9 +459,9 @@ def render_hero(title: str, subtitle: str, chips: list[str] | None = None) -> No
 def render_panel(title: str, subtitle: str) -> None:
     st.markdown(
         (
-            "<div class='zrs-panel'>"
-            f"<div class='zrs-panel-title'>{title}</div>"
-            f"<p class='zrs-panel-sub'>{subtitle}</p>"
+            "<div class='sn-panel'>"
+            f"<div class='sn-panel-title'>{title}</div>"
+            f"<p class='sn-panel-sub'>{subtitle}</p>"
             "</div>"
         ),
         unsafe_allow_html=True,
@@ -460,29 +471,14 @@ def render_panel(title: str, subtitle: str) -> None:
 def render_command_header(page: str) -> None:
     st.markdown(
         (
-            "<div class='zrs-panel'>"
-            f"<div class='zrs-panel-title'>{APP_NAME} — Command Center</div>"
-            f"<p class='zrs-panel-sub'>Sezione attiva: <b>{page}</b> · "
-            "UI ottimizzata per inserimento rapido sul campo.</p>"
+            "<div class='sn-panel'>"
+            f"<div class='sn-panel-title'>{APP_NAME} — Command Center</div>"
+            f"<p class='sn-panel-sub'>Sezione attiva: <b>{page}</b> · "
+            "UI ottimizzata per lettura rapida coach-atleta in campo.</p>"
             "</div>"
         ),
         unsafe_allow_html=True,
     )
-
-
-def step_badge(current: int, total: int, label: str) -> None:
-    st.markdown(
-        f"<span class='zrs-step-badge'>Step {current}/{total} · {label}</span>",
-        unsafe_allow_html=True,
-    )
-
-
-# =============================================================================
-# Distanze — fix preset (callback + session_state, lettura solo al salva)
-# =============================================================================
-def _init_distance(key: str, default: float) -> None:
-    if key not in st.session_state:
-        st.session_state[key] = float(default)
 
 
 def _set_distance(key: str, value: float) -> None:
@@ -500,25 +496,11 @@ def distance_input(
     max_value: float,
     step: float,
     presets: list[float] | None = None,
-    default: float | None = None,
 ) -> None:
-    """Mostra campo distanza + preset; leggere il valore con read_distance() al conferma/salva."""
-    init = float(default if default is not None else min_value)
-    _init_distance(key, init)
+    """Mostra campo + preset. Leggere il valore con read_distance() al conferma/salva."""
+    if key not in st.session_state:
+        st.session_state[key] = float(min_value)
     st.markdown(f"**{label}**")
-    if presets:
-        st.caption("Tap rapido — aggiorna subito il valore")
-        st.markdown('<div class="zrs-preset-row">', unsafe_allow_html=True)
-        cols = st.columns(min(len(presets), 6))
-        for i, p in enumerate(presets[:6]):
-            cols[i].button(
-                f"{p:g} m",
-                key=f"{key}_preset_{i}",
-                use_container_width=True,
-                on_click=_set_distance,
-                args=(key, float(p)),
-            )
-        st.markdown("</div>", unsafe_allow_html=True)
     st.number_input(
         "metri",
         min_value=float(min_value),
@@ -527,26 +509,21 @@ def distance_input(
         key=key,
         label_visibility="collapsed",
     )
-
-
-def big_choice_grid(
-    options: list[str],
-    key_prefix: str,
-    on_pick: Any,
-    cols_n: int = 3,
-) -> None:
-    cols = st.columns(cols_n)
-    for i, opt in enumerate(options):
-        if cols[i % cols_n].button(
-            opt,
-            key=f"{key_prefix}_{i}",
-            use_container_width=True,
-        ):
-            on_pick(opt)
+    if presets:
+        st.caption("Preset rapidi")
+        cols = st.columns(min(len(presets), 6))
+        for i, p in enumerate(presets[:6]):
+            cols[i].button(
+                f"{p:g} m",
+                key=f"{key}_p{i}",
+                use_container_width=True,
+                on_click=_set_distance,
+                args=(key, float(p)),
+            )
 
 
 # =============================================================================
-# Strokes gained
+# Strokes gained (modello semplificato da practice — coerente tra settori)
 # =============================================================================
 def _interp(x: float, xs: list[float], ys: list[float]) -> float:
     if x <= xs[0]:
@@ -561,6 +538,7 @@ def _interp(x: float, xs: list[float], ys: list[float]) -> float:
 
 
 def expected_putts(distance_m: float) -> float:
+    """Colpi attesi PGA-style (approssimazione) da distanza in metri."""
     if distance_m <= 0:
         return 0.0
     xs = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30]
@@ -569,6 +547,7 @@ def expected_putts(distance_m: float) -> float:
 
 
 def expected_short_hole(dist_m: float, lie: str) -> float:
+    """Colpi attesi fino alla buca dal gioco corto (non green)."""
     if dist_m <= 0:
         return 0.0
     lie_adj = {
@@ -588,6 +567,7 @@ def expected_short_hole(dist_m: float, lie: str) -> float:
 
 
 def expected_long_hole(dist_m: float, from_tee: bool) -> float:
+    """Approccio / tee: colpi attesi verso la buca prima/dopo il colpo."""
     if dist_m <= 0:
         return 0.0
     if from_tee:
@@ -600,7 +580,9 @@ def expected_long_hole(dist_m: float, from_tee: bool) -> float:
 
 
 def compute_sg_putt(start_m: float, end_m: float) -> float:
-    return float(expected_putts(start_m) - expected_putts(end_m) - 1.0)
+    exp_before = expected_putts(start_m)
+    exp_after = expected_putts(end_m)
+    return float(exp_before - exp_after - 1.0)
 
 
 def compute_sg_short(start_m: float, end_m: float, lie_s: str, lie_e: str) -> float:
@@ -609,17 +591,15 @@ def compute_sg_short(start_m: float, end_m: float, lie_s: str, lie_e: str) -> fl
             return expected_putts(d)
         return expected_short_hole(d, lie)
 
-    return float(exp_at(start_m, lie_s) - exp_at(end_m, lie_e) - 1.0)
+    exp_before = exp_at(start_m, lie_s)
+    exp_after = exp_at(end_m, lie_e)
+    return float(exp_before - exp_after - 1.0)
 
 
 def compute_sg_long(start_before_m: float, start_after_m: float, from_tee: bool, lie_after: str) -> float:
     exp_before = expected_long_hole(start_before_m, from_tee)
     use_fairway = lie_after.lower() == "fairway"
-    exp_after = (
-        expected_long_hole(start_after_m, from_tee=False)
-        if use_fairway
-        else expected_short_hole(start_after_m, lie_after)
-    )
+    exp_after = expected_long_hole(start_after_m, from_tee=False) if use_fairway else expected_short_hole(start_after_m, lie_after)
     return float(exp_before - exp_after - 1.0)
 
 
@@ -638,8 +618,14 @@ def load_data() -> pd.DataFrame:
                 df[c] = np.nan
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce").dt.date
         for num in [
-            "Proximity_Lateral_m", "Proximity_Depth_m", "Start_Dist_m", "End_Dist_m",
-            "Hole_Dist_Start_m", "Hole_Dist_End_m", "Rating", "Strokes_Gained",
+            "Proximity_Lateral_m",
+            "Proximity_Depth_m",
+            "Start_Dist_m",
+            "End_Dist_m",
+            "Hole_Dist_Start_m",
+            "Hole_Dist_End_m",
+            "Rating",
+            "Strokes_Gained",
         ]:
             df[num] = pd.to_numeric(df[num], errors="coerce")
         return df[DATA_COLUMNS]
@@ -667,13 +653,11 @@ def save_shot(row: dict[str, Any]) -> None:
 def session_shots(df: pd.DataFrame, user: str, session_name: str) -> pd.DataFrame:
     if df.empty:
         return df
-    d = df[(df["User"] == user) & (df["SessionName"] == session_name)].copy()
-    return d.sort_values(by=["Date", "Time"], ascending=[True, True])
+    return df[(df["User"] == user) & (df["SessionName"] == session_name)].sort_values(
+        by=["Date", "Time"], ascending=[True, True]
+    )
 
 
-# =============================================================================
-# Diario di Gioco — PDF tabellare per bastone
-# =============================================================================
 def _mode_or_dash(series: pd.Series) -> str:
     s = series.dropna().astype(str)
     s = s[(s != "") & (s != "nan")]
@@ -683,7 +667,6 @@ def _mode_or_dash(series: pd.Series) -> str:
 
 
 def club_summary_for_diario(df: pd.DataFrame) -> tuple[list[str], list[list[str]]]:
-    """Righe = metriche, colonne = bastoni (medie)."""
     if df.empty:
         return [], []
     clubs = (
@@ -694,18 +677,11 @@ def club_summary_for_diario(df: pd.DataFrame) -> tuple[list[str], list[list[str]
         .tolist()
     )
     header = ["Metrica"] + clubs
-    rows: list[list[str]] = []
-
-    row_counts = ["N° colpi"]
-    for cl in clubs:
-        row_counts.append(str(int((df["Club"] == cl).sum())))
-    rows.append(row_counts)
-
+    rows: list[list[str]] = [["N° colpi"] + [str(int((df["Club"] == cl).sum())) for cl in clubs]]
     for field, label in NUMERIC_AVG_FIELDS:
         row = [label]
         for cl in clubs:
-            sub = df[df["Club"] == cl]
-            vals = pd.to_numeric(sub[field], errors="coerce").dropna()
+            vals = pd.to_numeric(df.loc[df["Club"] == cl, field], errors="coerce").dropna()
             if vals.empty:
                 row.append("—")
             elif field == "Strokes_Gained":
@@ -715,7 +691,6 @@ def club_summary_for_diario(df: pd.DataFrame) -> tuple[list[str], list[list[str]
             else:
                 row.append(f"{vals.mean():.2f}")
         rows.append(row)
-
     for field, label in [
         ("Impact", "Impatto più frequente"),
         ("Curvature", "Curvatura più frequente"),
@@ -724,263 +699,63 @@ def club_summary_for_diario(df: pd.DataFrame) -> tuple[list[str], list[list[str]
     ]:
         row = [label]
         for cl in clubs:
-            sub = df[df["Club"] == cl]
-            row.append(_mode_or_dash(sub[field]) if field in sub.columns else "—")
+            row.append(_mode_or_dash(df.loc[df["Club"] == cl, field]))
         rows.append(row)
-
     return header, rows
 
 
-def _diario_meta(df_session: pd.DataFrame, user: str, session_name: str) -> dict[str, str]:
-    now = datetime.datetime.now()
-    times = df_session["Time"].dropna().astype(str).tolist() if not df_session.empty else []
-    t_range = f"{times[0]} – {times[-1]}" if len(times) >= 2 else (times[0] if times else now.strftime("%H:%M"))
-    cats = df_session["Category"].dropna().unique().tolist() if not df_session.empty else []
-    cat_txt = ", ".join(CATEGORIES.get(c, c) for c in cats) if cats else "—"
-    return {
-        "atleta": user,
-        "sessione": session_name,
-        "data": datetime.date.today().strftime("%d/%m/%Y"),
-        "ora": t_range,
-        "settori": cat_txt,
-        "colpi": str(len(df_session)),
-        "generato": now.strftime("%d/%m/%Y %H:%M"),
-    }
-
-
-def _logo_data_uri() -> str:
-    path = Path("logo.png")
-    if not path.is_file():
-        return ""
-    try:
-        raw = path.read_bytes()
-        b64 = base64.b64encode(raw).decode("ascii")
-        return f"data:image/png;base64,{b64}"
-    except Exception:
-        return ""
-
-
-def build_diario_html(
-    df_session: pd.DataFrame,
-    user: str,
-    session_name: str,
-) -> str:
-    """Diario stampabile: zero dipendenze extra, funziona su qualsiasi deploy Streamlit."""
-    meta = _diario_meta(df_session, user, session_name)
-    header, rows = club_summary_for_diario(df_session)
-    logo_uri = _logo_data_uri()
-    logo_block = (
-        f'<img src="{logo_uri}" alt="Logo" class="logo" />'
-        if logo_uri
-        else f'<div class="logo-fallback">{html.escape(APP_NAME)}</div>'
-    )
-
-    table_html = ""
-    if header:
-        thead = "".join(f"<th>{html.escape(c)}</th>" for c in header)
-        body_rows = []
-        for r in rows:
-            cells = "".join(f"<td>{html.escape(str(c))}</td>" for c in r)
-            body_rows.append(f"<tr>{cells}</tr>")
-        table_html = (
-            "<table class='stats'>"
-            f"<thead><tr>{thead}</tr></thead>"
-            f"<tbody>{''.join(body_rows)}</tbody>"
-            "</table>"
-        )
-    else:
-        table_html = "<p class='muted'>Nessun colpo in questa sessione.</p>"
-
-    return f"""<!DOCTYPE html>
-<html lang="it">
-<head>
-<meta charset="utf-8"/>
-<title>Diario di Gioco — {html.escape(user)}</title>
-<style>
-  @page {{ margin: 1.5cm; }}
-  body {{
-    font-family: 'Segoe UI', system-ui, sans-serif;
-    color: {BLACK};
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 24px;
-    background: {WHITE};
-  }}
-  .header {{ display: flex; gap: 20px; align-items: flex-start; margin-bottom: 20px; }}
-  .logo {{ max-height: 72px; max-width: 120px; }}
-  .logo-fallback {{ font-weight: 800; color: {OCHRE}; font-size: 1.1rem; }}
-  h1 {{ margin: 0 0 4px 0; font-size: 1.5rem; }}
-  .app {{ color: {MUTED}; margin: 0; font-size: 0.95rem; }}
-  .meta {{ width: 100%; border-collapse: collapse; margin: 16px 0 24px; font-size: 0.9rem; }}
-  .meta td {{ padding: 6px 10px; border-bottom: 1px solid {CARD_BORDER}; }}
-  .meta td:first-child {{ font-weight: 700; width: 180px; color: {BLACK}; }}
-  h2 {{ font-size: 1.1rem; border-left: 4px solid {ORANGE}; padding-left: 10px; }}
-  table.stats {{
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.82rem;
-    margin-top: 8px;
-  }}
-  table.stats th {{
-    background: {ORANGE};
-    color: {WHITE};
-    padding: 8px 6px;
-    text-align: center;
-  }}
-  table.stats td {{
-    padding: 7px 6px;
-    border: 1px solid {CARD_BORDER};
-    text-align: center;
-  }}
-  table.stats td:first-child {{ text-align: left; font-weight: 600; }}
-  table.stats tbody tr:nth-child(even) {{ background: {OFF_WHITE}; }}
-  .note, .muted {{ color: {MUTED}; font-size: 0.85rem; }}
-  .footer {{
-    margin-top: 32px;
-    padding-top: 12px;
-    border-top: 1px solid {CARD_BORDER};
-    font-size: 0.8rem;
-    color: {MUTED};
-    text-align: center;
-  }}
-  @media print {{
-    body {{ padding: 0; }}
-    .no-print {{ display: none; }}
-  }}
-</style>
-</head>
-<body>
-<div class="header">
-  {logo_block}
-  <div>
-    <h1>Diario di Gioco</h1>
-    <p class="app">{html.escape(APP_NAME)}</p>
-  </div>
-</div>
-<table class="meta">
-  <tr><td>Atleta</td><td>{html.escape(meta['atleta'])}</td></tr>
-  <tr><td>Sessione</td><td>{html.escape(meta['sessione'])}</td></tr>
-  <tr><td>Data</td><td>{html.escape(meta['data'])}</td></tr>
-  <tr><td>Ora / intervallo</td><td>{html.escape(meta['ora'])}</td></tr>
-  <tr><td>Settori</td><td>{html.escape(meta['settori'])}</td></tr>
-  <tr><td>Colpi totali</td><td>{html.escape(meta['colpi'])}</td></tr>
-  <tr><td>Generato il</td><td>{html.escape(meta['generato'])}</td></tr>
-</table>
-<h2>Statistiche medie per bastone</h2>
-<p class="note">Medie sui colpi della sessione corrente — una colonna per ogni bastone utilizzato.</p>
-{table_html}
-<p class="no-print note">Per ottenere un PDF: apri questo file nel browser e usa Stampa → Salva come PDF.</p>
-<div class="footer">© Andrea Zanardelli · Co-designed by Andrea Zanardelli and Edoardo Venturoli</div>
-</body>
-</html>"""
-
-
-def build_diario_pdf(
-    df_session: pd.DataFrame,
-    user: str,
-    session_name: str,
-) -> bytes | None:
+def build_diario_pdf(df_session: pd.DataFrame, user: str, session_name: str) -> bytes | None:
     if not HAS_REPORTLAB:
         return None
     buf = io.BytesIO()
-    doc = SimpleDocTemplate(
-        buf,
-        pagesize=A4,
-        leftMargin=1.4 * cm,
-        rightMargin=1.4 * cm,
-        topMargin=1.2 * cm,
-        bottomMargin=1.2 * cm,
-    )
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.4 * cm, rightMargin=1.4 * cm, topMargin=1.2 * cm, bottomMargin=1.2 * cm)
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle(
-        "ZTitle",
-        parent=styles["Heading1"],
-        fontSize=18,
-        textColor=rl_colors.HexColor(BLACK),
-        spaceAfter=6,
-    )
-    sub_style = ParagraphStyle(
-        "ZSub",
-        parent=styles["Normal"],
-        fontSize=10,
-        textColor=rl_colors.HexColor(MUTED),
-        spaceAfter=4,
-    )
+    title_style = ParagraphStyle("ZTitle", parent=styles["Heading1"], fontSize=18, textColor=rl_colors.HexColor(TEXT))
+    sub_style = ParagraphStyle("ZSub", parent=styles["Normal"], fontSize=10, textColor=rl_colors.HexColor(MUTED))
     story: list[Any] = []
-
     try:
         logo = RLImage("logo.png", width=3.2 * cm, height=3.2 * cm)
         logo.hAlign = "LEFT"
         story.append(logo)
     except Exception:
         pass
-
     story.append(Paragraph("Diario di Gioco", title_style))
-    story.append(Paragraph(f"<b>{APP_NAME}</b>", sub_style))
-
-    meta_dict = _diario_meta(df_session, user, session_name)
+    story.append(Paragraph(f"<b>{html_lib.escape(APP_NAME)}</b>", sub_style))
+    now = datetime.datetime.now()
+    times = df_session["Time"].dropna().astype(str).tolist() if not df_session.empty else []
+    t_range = f"{times[0]} – {times[-1]}" if len(times) >= 2 else (times[0] if times else now.strftime("%H:%M"))
+    cats = df_session["Category"].dropna().unique().tolist() if not df_session.empty else []
+    cat_txt = ", ".join(CATEGORIES.get(c, c) for c in cats) if cats else "—"
     meta = [
-        ["Atleta", meta_dict["atleta"]],
-        ["Sessione", meta_dict["sessione"]],
-        ["Data", meta_dict["data"]],
-        ["Ora / intervallo", meta_dict["ora"]],
-        ["Settori", meta_dict["settori"]],
-        ["Colpi totali sessione", meta_dict["colpi"]],
-        ["Generato il", meta_dict["generato"]],
+        ["Atleta", user], ["Sessione", session_name],
+        ["Data", datetime.date.today().strftime("%d/%m/%Y")],
+        ["Ora / intervallo", t_range], ["Settori", cat_txt],
+        ["Colpi totali", str(len(df_session))], ["Generato il", now.strftime("%d/%m/%Y %H:%M")],
     ]
-    meta_table = Table(meta, colWidths=[4.5 * cm, 12 * cm])
-    meta_table.setStyle(
-        TableStyle([
-            ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("TEXTCOLOR", (0, 0), (0, -1), rl_colors.HexColor(BLACK)),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ])
-    )
-    story.append(meta_table)
-    story.append(Spacer(1, 0.5 * cm))
-
+    mt = Table(meta, colWidths=[4.5 * cm, 12 * cm])
+    mt.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.extend([mt, Spacer(1, 0.5 * cm)])
     header, rows = club_summary_for_diario(df_session)
-    if not header:
-        story.append(Paragraph("Nessun colpo registrato in questa sessione.", sub_style))
-    else:
+    if header:
         story.append(Paragraph("Statistiche medie per bastone", styles["Heading2"]))
-        story.append(Spacer(1, 0.2 * cm))
-        table_data = [header] + rows
         n_clubs = max(len(header) - 1, 1)
-        col_w = [4.2 * cm] + [max(2.0 * cm, 16.0 * cm / n_clubs)] * n_clubs
-        tbl = Table(table_data, colWidths=col_w[: len(header)])
-        tbl.setStyle(
-            TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor(ORANGE)),
-                ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, -1), 8),
-                ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-                ("ALIGN", (0, 1), (0, -1), "LEFT"),
-                ("GRID", (0, 0), (-1, -1), 0.5, rl_colors.HexColor(CARD_BORDER)),
-                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [rl_colors.white, rl_colors.HexColor(OFF_WHITE)]),
-                ("TOPPADDING", (0, 0), (-1, -1), 5),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
-            ])
-        )
+        tbl = Table([header] + rows, colWidths=[4.2 * cm] + [max(2.0 * cm, 16.0 * cm / n_clubs)] * n_clubs)
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor(ORANGE)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("ALIGN", (0, 1), (0, -1), "LEFT"),
+            ("GRID", (0, 0), (-1, -1), 0.5, rl_colors.HexColor(CARD_BORDER)),
+        ]))
         story.append(tbl)
-        story.append(Spacer(1, 0.4 * cm))
-        story.append(
-            Paragraph(
-                "Medie calcolate sui colpi della sessione corrente, una colonna per ogni bastone utilizzato.",
-                sub_style,
-            )
-        )
-
-    story.append(Spacer(1, 0.6 * cm))
-    story.append(
-        Paragraph(
-            "© Andrea Zanardelli · Co-designed by Andrea Zanardelli and Edoardo Venturoli",
-            sub_style,
-        )
-    )
+    story.append(Spacer(1, 0.5 * cm))
+    story.append(Paragraph("© Andrea Zanardelli · Co-designed by Andrea Zanardelli and Edoardo Venturoli", sub_style))
     doc.build(story)
     buf.seek(0)
     return buf.read()
@@ -989,83 +764,37 @@ def build_diario_pdf(
 def diario_panel(user: str, session_name: str) -> None:
     render_hero(
         "Diario di Gioco",
-        "Scarica il report in PDF con un click. Gli atleti usano solo il browser — il PDF è generato dal server.",
-        ["PDF", "Medie per bastone", "Sessione live"],
+        "PDF tabellare con medie per bastone della sessione corrente.",
+        ["PDF", "Medie per bastone"],
     )
-    df_all = load_data()
-    df_sess = session_shots(df_all, user, session_name)
-
-    m1, m2, m3 = st.columns(3)
-    m1.metric("Colpi in sessione", len(df_sess))
-    clubs_n = df_sess["Club"].nunique() if not df_sess.empty else 0
-    m2.metric("Bastoni usati", clubs_n)
-    sg = pd.to_numeric(df_sess["Strokes_Gained"], errors="coerce").dropna()
-    m3.metric("SG medio sessione", f"{sg.mean():+.3f}" if len(sg) else "—")
-
+    df_sess = session_shots(load_data(), user, session_name)
     if df_sess.empty:
-        st.info("Registra almeno un colpo in questa sessione per generare il Diario di Gioco.")
+        st.info("Registra almeno un colpo in questa sessione.")
         brand_footer()
         return
-
-    st.markdown("#### Anteprima dati sessione")
-    preview_cols = ["Time", "Category", "Club", "Rating", "Strokes_Gained", "Start_Dist_m", "End_Dist_m"]
-    st.dataframe(
-        df_sess[[c for c in preview_cols if c in df_sess.columns]],
-        use_container_width=True,
-        hide_index=True,
-    )
-
     header, rows = club_summary_for_diario(df_sess)
     if header:
-        st.markdown("#### Medie per bastone (anteprima)")
         st.dataframe(pd.DataFrame(rows, columns=header), use_container_width=True, hide_index=True)
-
-    safe_name = "".join(c if c.isalnum() or c in "-_" else "_" for c in session_name)[:40]
-    file_stub = f"Diario_Gioco_{user}_{safe_name}_{datetime.date.today():%Y%m%d}"
-
     if not HAS_REPORTLAB:
-        st.error(
-            "Il modulo **reportlab** non è installato sul server che esegue l'app. "
-            "Chi gestisce il deploy deve eseguire una sola volta: "
-            "`pip install -r requirements.txt` (oppure rideploy su Streamlit Cloud con il requirements aggiornato)."
-        )
-        st.download_button(
-            label="Scarica Diario (HTML — alternativa)",
-            data=build_diario_html(df_sess, user, session_name).encode("utf-8"),
-            file_name=f"{file_stub}.html",
-            mime="text/html",
-            use_container_width=True,
-        )
+        st.error("PDF non disponibile: installa reportlab sul server (`pip install reportlab`).")
         brand_footer()
         return
-
     pdf_bytes = build_diario_pdf(df_sess, user, session_name)
-    if not pdf_bytes:
-        st.error("Errore nella generazione del PDF. Riprova tra qualche secondo.")
-        brand_footer()
-        return
-
-    st.download_button(
-        label="Scarica Diario di Gioco (PDF)",
-        data=pdf_bytes,
-        file_name=f"{file_stub}.pdf",
-        mime="application/pdf",
-        type="primary",
-        use_container_width=True,
-    )
-    with st.expander("Alternativa: scarica HTML (stampa come PDF dal browser)"):
+    if pdf_bytes:
+        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in session_name)[:40]
         st.download_button(
-            label="Scarica versione HTML",
-            data=build_diario_html(df_sess, user, session_name).encode("utf-8"),
-            file_name=f"{file_stub}.html",
-            mime="text/html",
+            "Scarica Diario di Gioco (PDF)",
+            data=pdf_bytes,
+            file_name=f"Diario_Gioco_{user}_{safe}_{datetime.date.today():%Y%m%d}.pdf",
+            mime="application/pdf",
+            type="primary",
             use_container_width=True,
         )
     brand_footer()
 
 
 # =============================================================================
-# Splash & login (splash mantiene SUPERNOVA)
+# Splash & login
 # =============================================================================
 def run_splash_sequence() -> None:
     holder = st.empty()
@@ -1085,12 +814,12 @@ def run_splash_sequence() -> None:
                         st.image("logo.png", use_container_width=True)
                     except Exception:
                         st.markdown(
-                            f"<h1 style='text-align:center;color:{OCHRE};'>SUPERNOVA</h1>",
+                            f"<h1 style='text-align:center;color:{GOLD};'>SUPERNOVA</h1>",
                             unsafe_allow_html=True,
                         )
                 else:
                     st.markdown(
-                        f"<h2 style='text-align:center;color:{OCHRE_DARK};margin-top:4rem;'>{msg}</h2>",
+                        f"<h2 style='text-align:center;color:{GOLD_DARK};margin-top:4rem;'>{msg}</h2>",
                         unsafe_allow_html=True,
                     )
         time.sleep(dur)
@@ -1114,12 +843,13 @@ def login_screen() -> None:
             st.error("Inserisci uno username.")
             return
         pwd_ok = p == PASSWORD_DEFAULT
+        env_p = None
         try:
             env_p = st.secrets.get("APP_PASSWORD")
-            if env_p:
-                pwd_ok = pwd_ok or (p == str(env_p))
         except Exception:
-            pass
+            env_p = None
+        if env_p:
+            pwd_ok = pwd_ok or (p == str(env_p))
         if pwd_ok:
             st.session_state["logged_in"] = True
             st.session_state["user"] = u.upper()
@@ -1141,7 +871,7 @@ def run_post_auth_logo() -> None:
                 st.image("logo.png", use_container_width=True)
             except Exception:
                 st.markdown(
-                    f"<h1 style='text-align:center;color:{OCHRE};'>{APP_NAME}</h1>",
+                    f"<h1 style='text-align:center;color:{GOLD};'>SUPERNOVA</h1>",
                     unsafe_allow_html=True,
                 )
     time.sleep(2.0)
@@ -1157,7 +887,6 @@ def reset_wizard() -> None:
             del st.session_state[k]
     st.session_state["wz_cat"] = None
     st.session_state["wz_step"] = 0
-    st.session_state["wz_payload"] = {}
 
 
 def lat_sign(direction: str, lateral_abs: float) -> float:
@@ -1169,6 +898,7 @@ def lat_sign(direction: str, lateral_abs: float) -> float:
 
 
 def depth_sign(depth_m: float, label: str) -> float:
+    """Profondità: positivo = lungo, negativo = corto (optional convention)."""
     if label == "Corto del bersaglio":
         return -abs(depth_m)
     if label == "Lungo del bersaglio":
@@ -1212,16 +942,14 @@ def plot_pie(df: pd.DataFrame, column: str, title: str, legend_help: str) -> Non
         names=vc.index,
         title=title,
         hole=0.35,
-        color_discrete_sequence=[ORANGE, OCHRE, OCHRE_LIGHT, ORANGE_DEEP, BLACK_SOFT, MUTED],
+        color_discrete_sequence=px.colors.sequential.YlOrBr,
     )
     fig.update_traces(textposition="inside", textinfo="percent+label")
     fig.update_layout(
         legend_title_text="Legenda",
         font=dict(color=TEXT),
-        title=dict(font=dict(size=18, color=BLACK)),
+        title=dict(font=dict(size=18, color=GOLD_DARK)),
         margin=dict(t=48, b=24, l=24, r=24),
-        paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="rgba(0,0,0,0)",
     )
     st.plotly_chart(fig, use_container_width=True)
     st.caption(legend_help)
@@ -1235,7 +963,7 @@ def plot_dispersion(df: pd.DataFrame, title: str) -> None:
     d["y_depth_m"] = pd.to_numeric(d["Proximity_Depth_m"], errors="coerce")
     d = d.dropna(subset=["x_lateral_m", "y_depth_m"])
     if d.empty:
-        st.info("Aggiungi errore laterale e profondità per vedere la dispersione dall'alto.")
+        st.info("Aggiungi errore laterale e profondità per vedere la dispersione dall’alto.")
         return
     fig = px.scatter(
         d,
@@ -1248,18 +976,22 @@ def plot_dispersion(df: pd.DataFrame, title: str) -> None:
             "x_lateral_m": "Errore laterale (m): sinistra ← 0 → destra",
             "y_depth_m": "Errore in profondità (m): indietro ← 0 → avanti",
         },
-        color_discrete_sequence=px.colors.sequential.Oranges_r,
     )
-    fig.add_vline(x=0, line_dash="dash", line_color=OCHRE)
-    fig.add_hline(y=0, line_dash="dash", line_color=OCHRE)
-    fig.update_layout(legend_title_text="Legenda", font=dict(color=TEXT))
+    fig.add_vline(x=0, line_dash="dash", line_color=GOLD)
+    fig.add_hline(y=0, line_dash="dash", line_color=GOLD)
+    fig.update_layout(
+        legend_title_text="Legenda",
+        font=dict(color=TEXT),
+    )
     st.plotly_chart(fig, use_container_width=True)
     st.caption(
-        "Ogni punto è un colpo visto dall'alto: incrocio delle linee = bersaglio."
+        "Ogni punto è un colpo visto dall’alto: incrocio delle linee = bersaglio. "
+        "L’asse orizzontale è l’errore a sinistra/destra, quello verticale corto/lungo."
     )
 
 
 def putting_make_table(df_putt: pd.DataFrame) -> None:
+    """Bucket da 15 m in giù ogni 2 m."""
     if df_putt.empty:
         st.info("Nessun putt nel periodo.")
         return
@@ -1277,7 +1009,15 @@ def putting_make_table(df_putt: pd.DataFrame) -> None:
         rows.append({"Fascia di partenza": f"{lo}–{hi} m", "Putt": n, "Realizzati": made, "% Made": pct})
     out = pd.DataFrame(rows)
     st.markdown("#### Tabella realizzazione putt per distanza di partenza")
-    st.dataframe(out.style.format({"% Made": "{:.1f}%"}), use_container_width=True, hide_index=True)
+    st.caption(
+        "Percentuale di putt chiusi in buca al primo tentativo (distanza finale = 0 m), "
+        "raggruppati per ampiezza di 2 metri fino a 15 m."
+    )
+    st.dataframe(
+        out.style.format({"% Made": "{:.1f}%"}),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def sg_summary_table(df: pd.DataFrame, cat_key: str) -> None:
@@ -1290,12 +1030,22 @@ def sg_summary_table(df: pd.DataFrame, cat_key: str) -> None:
         st.info("Colonna strokes gained vuota per questo periodo.")
         return
     st.markdown("#### Riepilogo Strokes Gained (modello practice)")
+    st.caption(
+        "Valori positivi indicano un colpo migliore della media di riferimento usata dal modello "
+        "(approssimazione didattica, non ufficiale PGA)."
+    )
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Media SG", f"{sg.mean():+.3f}")
     c2.metric("Totale SG", f"{sg.sum():+.3f}")
     c3.metric("Colpi", f"{len(sg)}")
     c4.metric("Migliore", f"{sg.max():+.3f}")
-    hist = px.histogram(sg, nbins=20, title="Distribuzione SG", color_discrete_sequence=[ORANGE])
+    hist = px.histogram(
+        sg,
+        nbins=20,
+        title="Distribuzione SG colpo per colpo",
+        labels={"value": "Strokes gained per colpo", "count": "Numero di colpi"},
+        color_discrete_sequence=[GOLD],
+    )
     hist.update_layout(showlegend=False)
     st.plotly_chart(hist, use_container_width=True)
 
@@ -1304,8 +1054,18 @@ def satisfaction_breakdown(df: pd.DataFrame, cat_key: str) -> None:
     sub = df[df["Category"] == cat_key]
     if sub.empty:
         return
-    plot_pie(sub, "Rating", "Distribuzione voto colpo (1–5)", "Legenda: voto auto-valutato.")
-    plot_pie(sub, "Mental_Reaction", "Reazione mentale", "Legenda: reazioni dichiarate dopo il colpo.")
+    plot_pie(
+        sub,
+        "Rating",
+        "Distribuzione voto colpo (1–5)",
+        "Legenda: percentuale di colpi per ogni voto di qualità auto-valutata.",
+    )
+    plot_pie(
+        sub,
+        "Mental_Reaction",
+        "Reazione mentale",
+        "Legenda: mix delle reazioni emotive/cognitive dichiarate dopo il colpo.",
+    )
 
 
 def trend_panel(df_sector: pd.DataFrame, sector_label: str) -> None:
@@ -1320,23 +1080,51 @@ def trend_panel(df_sector: pd.DataFrame, sector_label: str) -> None:
     d["Strokes_Gained"] = pd.to_numeric(d["Strokes_Gained"], errors="coerce")
     grp = (
         d.groupby("Date", as_index=False)
-        .agg(rating_mean=("Rating", "mean"), sg_mean=("Strokes_Gained", "mean"), shots=("Category", "count"))
+        .agg(
+            rating_mean=("Rating", "mean"),
+            sg_mean=("Strokes_Gained", "mean"),
+            shots=("Category", "count"),
+        )
         .sort_values("Date")
+    )
+    grp["Day"] = grp["Date"].dt.strftime("%d/%m/%Y")
+    st.markdown("#### Trend giornaliero")
+    st.caption(
+        "Linea oro = voto medio; linea scura = strokes gained medio per giorno. "
+        "Serve a capire se la qualità sale o scende nel tempo."
     )
     fig = go.Figure()
     fig.add_trace(
-        go.Scatter(x=grp["Date"], y=grp["rating_mean"], mode="lines+markers", name="Voto medio", line=dict(color=OCHRE, width=3))
+        go.Scatter(
+            x=grp["Date"],
+            y=grp["rating_mean"],
+            mode="lines+markers",
+            name="Voto medio",
+            line=dict(color=GOLD, width=3),
+        )
     )
     fig.add_trace(
         go.Scatter(
-            x=grp["Date"], y=grp["sg_mean"], mode="lines+markers", name="SG medio",
-            line=dict(color=BLACK, width=2), yaxis="y2",
+            x=grp["Date"],
+            y=grp["sg_mean"],
+            mode="lines+markers",
+            name="SG medio",
+            line=dict(color="#5c4a12", width=2),
+            yaxis="y2",
         )
     )
     fig.update_layout(
         title=f"Andamento performance - {sector_label}",
+        xaxis_title="Giorno",
         yaxis=dict(title="Voto medio (1-5)"),
         yaxis2=dict(title="SG medio", overlaying="y", side="right"),
+        legend_title_text="Legenda",
+        margin=dict(t=48, b=24, l=24, r=24),
+    )
+    fig.update_xaxes(
+        tickformat="%d/%m/%Y",
+        ticklabelmode="period",
+        hoverformat="%d/%m/%Y",
     )
     st.plotly_chart(fig, use_container_width=True)
 
@@ -1349,11 +1137,24 @@ def club_breakdown_table(df_sector: pd.DataFrame) -> None:
     d["Strokes_Gained"] = pd.to_numeric(d["Strokes_Gained"], errors="coerce")
     g = (
         d.groupby("Club", as_index=False)
-        .agg(Colpi=("Club", "count"), Voto_medio=("Rating", "mean"), SG_medio=("Strokes_Gained", "mean"))
+        .agg(
+            Colpi=("Club", "count"),
+            Voto_medio=("Rating", "mean"),
+            SG_medio=("Strokes_Gained", "mean"),
+        )
         .sort_values(["Colpi", "Voto_medio"], ascending=[False, False])
     )
-    st.markdown("#### Ranking bastoni")
-    st.dataframe(g.style.format({"Voto_medio": "{:.2f}", "SG_medio": "{:+.3f}"}), use_container_width=True, hide_index=True)
+    if g.empty:
+        return
+    st.markdown("#### Ranking bastoni (nel filtro scelto)")
+    st.caption(
+        "Tabella sintetica per bastone: volume, voto medio e strokes gained medio."
+    )
+    st.dataframe(
+        g.style.format({"Voto_medio": "{:.2f}", "SG_medio": "{:+.3f}"}),
+        use_container_width=True,
+        hide_index=True,
+    )
 
 
 def sg_distance_table(df_sector: pd.DataFrame) -> None:
@@ -1366,13 +1167,28 @@ def sg_distance_table(df_sector: pd.DataFrame) -> None:
     bins = [0, 2, 5, 10, 20, 35, 50, 80, 130, 200, 600]
     labels = ["0-2", "2-5", "5-10", "10-20", "20-35", "35-50", "50-80", "80-130", "130-200", "200+"]
     d["Distance_Bucket"] = pd.cut(d["Start_Dist_m"], bins=bins, labels=labels, include_lowest=True, right=False)
-    g = d.groupby("Distance_Bucket", as_index=False).agg(Colpi=("Strokes_Gained", "count"), SG_medio=("Strokes_Gained", "mean")).dropna()
+    g = (
+        d.groupby("Distance_Bucket", as_index=False)
+        .agg(Colpi=("Strokes_Gained", "count"), SG_medio=("Strokes_Gained", "mean"))
+        .dropna()
+    )
     if g.empty:
         return
-    fig = px.bar(g, x="Distance_Bucket", y="SG_medio", color="SG_medio", color_continuous_scale="RdYlGn", title="SG per fascia distanza")
-    fig.add_hline(y=0, line_dash="dash", line_color=OCHRE_DARK)
+    st.markdown("#### Strokes gained per fascia distanza")
+    st.caption("Aiuta a capire in quali distanze perdi o guadagni colpi rispetto al benchmark usato.")
+    fig = px.bar(
+        g,
+        x="Distance_Bucket",
+        y="SG_medio",
+        color="SG_medio",
+        color_continuous_scale="RdYlGn",
+        labels={"Distance_Bucket": "Fascia metri", "SG_medio": "SG medio"},
+        title="Efficienza SG per distanza iniziale",
+    )
+    fig.add_hline(y=0, line_dash="dash", line_color=GOLD_DARK)
     fig.update_layout(coloraxis_showscale=False)
     st.plotly_chart(fig, use_container_width=True)
+    st.dataframe(g.style.format({"SG_medio": "{:+.3f}"}), use_container_width=True, hide_index=True)
 
 
 def directional_bias_panel(df_sector: pd.DataFrame) -> None:
@@ -1385,120 +1201,137 @@ def directional_bias_panel(df_sector: pd.DataFrame) -> None:
     right = int((d["x"] > 0).sum())
     center = int((d["x"] == 0).sum())
     total = len(d)
-    bias = pd.DataFrame({
-        "Direzione": ["Sinistra", "In linea", "Destra"],
-        "Colpi": [left, center, right],
-        "Percentuale": [left / total * 100, center / total * 100, right / total * 100],
-    })
+    st.markdown("#### Directional bias")
+    st.caption("Distribuzione colpi a sinistra/destra/centrali rispetto alla linea target.")
+    bias = pd.DataFrame(
+        {
+            "Direzione": ["Sinistra", "In linea", "Destra"],
+            "Colpi": [left, center, right],
+            "Percentuale": [left / total * 100, center / total * 100, right / total * 100],
+        }
+    )
     fig = px.bar(
-        bias, x="Direzione", y="Percentuale",
+        bias,
+        x="Direzione",
+        y="Percentuale",
         text=bias["Percentuale"].map(lambda v: f"{v:.1f}%"),
         color="Direzione",
         color_discrete_map={"Sinistra": "#d45858", "In linea": SUCCESS_GREEN, "Destra": ACCENT_BLUE},
+        title="Bias laterale medio",
     )
-    fig.update_layout(showlegend=False)
+    fig.update_layout(showlegend=False, yaxis_title="% colpi")
     st.plotly_chart(fig, use_container_width=True)
 
 
 # =============================================================================
-# Wizard inserimento — meno tap, distanze lette al conferma/salva
+# Wizard inserimento colpo
 # =============================================================================
-def _pick_club(shot: dict, clubs: list[str], cols_n: int, key_p: str, next_step: int) -> None:
-    cols = st.columns(cols_n)
-    for i, cl in enumerate(clubs):
-        if cols[i % cols_n].button(cl, key=f"{key_p}{i}", use_container_width=True):
-            shot["Club"] = cl
-            st.session_state["wz_step"] = next_step
-            st.rerun()
-
-
-def _pick_option(shot: dict, field: str, opt: str, next_step: int, extra: dict | None = None) -> None:
-    shot[field] = opt
-    if extra:
-        shot.update(extra)
-    st.session_state["wz_step"] = next_step
-    st.rerun()
-
-
 def wizard_range(session_name: str, user: str) -> None:
     st.session_state.setdefault("wz_step", 0)
     step = st.session_state["wz_step"]
     shot: dict[str, Any] = st.session_state.setdefault("wz_payload", {})
-    total = 9
 
     if step == 0:
-        step_badge(1, total, "Bastone")
-        _pick_club(shot, CLUBS_LONG, 4, "zr_cl_", 1)
+        st.markdown("#### Bastone")
+        cols = st.columns(3)
+        for i, cl in enumerate(CLUBS_LONG):
+            if cols[i % 3].button(cl, key=f"cl{i}"):
+                shot["Club"] = cl
+                st.session_state["wz_step"] = 1
+                st.rerun()
     elif step == 1:
-        step_badge(2, total, "Impatto")
+        st.markdown("#### Impatto")
         for opt in LONG_IMPACT:
-            if st.button(opt, key=f"zr_im_{opt}", use_container_width=True):
-                _pick_option(shot, "Impact", opt, 2)
+            if st.button(opt, key=f"im{opt}", use_container_width=True):
+                shot["Impact"] = opt
+                st.session_state["wz_step"] = 2
+                st.rerun()
     elif step == 2:
-        step_badge(3, total, "Curvatura")
+        st.markdown("#### Curvatura palla")
         for opt in LONG_CURVE:
-            if st.button(opt, key=f"zr_cv_{opt}", use_container_width=True):
-                _pick_option(shot, "Curvature", opt, 3, {"Trajectory": ""})
+            if st.button(opt, key=f"cv{opt}", use_container_width=True):
+                shot["Curvature"] = opt
+                shot["Trajectory"] = ""
+                st.session_state["wz_step"] = 3
+                st.rerun()
     elif step == 3:
-        step_badge(4, total, "Direzione")
+        st.markdown("#### Posizione rispetto al bersaglio (linea)")
         for opt in LONG_DIR:
-            if st.button(opt, key=f"zr_dir_{opt}", use_container_width=True):
-                _pick_option(shot, "Direction_LR", opt, 4)
+            if st.button(opt, key=f"dir{opt}", use_container_width=True):
+                shot["Direction_LR"] = opt
+                st.session_state["wz_step"] = 4
+                st.rerun()
     elif step == 4:
-        step_badge(5, total, "Errore laterale")
-        distance_input("Metri a destra/sinistra dal punto mirato", "wz_range_lat", 0.0, 120.0, 0.5, [0, 2, 5, 10, 20])
-        if st.button("Conferma laterale", type="primary", use_container_width=True):
-            lat = read_distance("wz_range_lat", 0.0)
-            shot["Proximity_Lateral_m"] = lat_sign(str(shot.get("Direction_LR", "")), lat)
+        st.markdown("#### Errore laterale (metri assoluti)")
+        distance_input(
+            "Metri a destra/sinistra dal punto mirato",
+            "wz_range_lat",
+            0.0,
+            120.0,
+            0.5,
+            [0, 2, 5, 10, 20],
+        )
+        if st.button("Conferma errore laterale", use_container_width=True):
+            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], read_distance("wz_range_lat", 0.0))
             st.session_state["wz_step"] = 5
             st.rerun()
     elif step == 5:
-        step_badge(6, total, "Errore profondità")
-        distance_input("Quanti metri corto/lungo?", "wz_range_depth", 0.0, 120.0, 0.5, [0, 2, 5, 10, 20])
-        sense = st.radio("Senso", ["In linea col bersaglio", "Corto del bersaglio", "Lungo del bersaglio"], horizontal=True)
-        if st.button("Conferma profondità", type="primary", use_container_width=True):
+        st.markdown("#### Errore in profondità (per mappa dall’alto)")
+        distance_input(
+            "Quanti metri corto/lungo?",
+            "wz_range_depth",
+            0.0,
+            120.0,
+            0.5,
+            [0, 2, 5, 10, 20],
+        )
+        sense = st.radio("Senso", ["In linea col bersaglio", "Corto del bersaglio", "Lungo del bersaglio"])
+        if st.button("Conferma profondità", use_container_width=True):
             shot["Proximity_Depth_m"] = depth_sign(read_distance("wz_range_depth", 0.0), sense)
             st.session_state["wz_step"] = 6
             st.rerun()
     elif step == 6:
-        step_badge(7, total, "Voto 1–5")
+        st.markdown("#### Voto colpo (1–5)")
         cols = st.columns(5)
         for v in range(1, 6):
-            if cols[v - 1].button(str(v), key=f"zr_rt_{v}", use_container_width=True):
+            if cols[v - 1].button(str(v)):
                 shot["Rating"] = v
                 st.session_state["wz_step"] = 7
                 st.rerun()
     elif step == 7:
-        step_badge(8, total, "Reazione mentale")
-        cols = st.columns(2)
-        for i, opt in enumerate(MENTAL_OPTIONS):
-            if cols[i % 2].button(opt, key=f"zr_mn_{opt}", use_container_width=True):
+        st.markdown("#### Reazione mentale")
+        for opt in MENTAL_OPTIONS:
+            if st.button(opt, key=f"mn{opt}", use_container_width=True):
                 shot["Mental_Reaction"] = opt
                 st.session_state["wz_step"] = 8
                 st.rerun()
     elif step == 8:
-        step_badge(9, total, "Strokes Gained")
-        shot["Lie_Long"] = st.radio("Lie di partenza", ["Tee", "Fairway"], horizontal=True)
+        st.markdown("#### Dati per Strokes Gained — gioco lungo")
+        shot["Lie_Long"] = st.radio("Lie di partenza", ["Tee", "Fairway"])
         distance_input(
-            "Distanza dalla buca prima del colpo (m)",
-            "wz_range_hole_start", 0.0, 550.0, 1.0,
-            [40, 80, 120, 160, 200, 250],
-            default=120.0,
+            "Distanza dalla buca prima del colpo (metri)",
+            "wz_range_hole_start",
+            0.0,
+            550.0,
+            1.0,
+            [40, 80, 120, 160, 200],
         )
         distance_input(
-            "Distanza dalla buca dopo il colpo (m)",
-            "wz_range_hole_end", 0.0, 550.0, 1.0,
-            [0, 10, 30, 60, 100, 150],
-            default=30.0,
+            "Distanza dalla buca dopo il colpo (metri)",
+            "wz_range_hole_end",
+            0.0,
+            550.0,
+            1.0,
+            [0, 10, 30, 60, 100],
         )
         lie_after = st.selectbox(
-            "Lie dopo il colpo",
+            "Lie dopo il colpo (per il modello)",
             ["Fairway", "First cut", "Semi-rough", "Rough", "Bunker", "Fringe", "Green"],
         )
-        if st.button("Salva colpo RANGE", type="primary", use_container_width=True):
-            hole_start = read_distance("wz_range_hole_start", 120.0)
-            hole_end = read_distance("wz_range_hole_end", 30.0)
-            from_tee = shot.get("Lie_Long") == "Tee"
+        if st.button("Calcola e salva colpo", type="primary", use_container_width=True):
+            hole_start = read_distance("wz_range_hole_start", 0.0)
+            hole_end = read_distance("wz_range_hole_end", 0.0)
+            from_tee = shot["Lie_Long"] == "Tee"
             sg = compute_sg_long(hole_start, hole_end, from_tee, lie_after)
             row = {
                 "User": user,
@@ -1528,7 +1361,6 @@ def wizard_range(session_name: str, user: str) -> None:
             st.success("Colpo RANGE salvato.")
             reset_wizard()
             st.rerun()
-
     if st.button("Annulla inserimento", key="cancel_r"):
         reset_wizard()
         st.rerun()
@@ -1538,88 +1370,119 @@ def wizard_short(session_name: str, user: str) -> None:
     st.session_state.setdefault("wz_step", 0)
     step = st.session_state["wz_step"]
     shot: dict[str, Any] = st.session_state.setdefault("wz_payload", {})
-    total = 11
 
     if step == 0:
-        step_badge(1, total, "Bastone")
-        _pick_club(shot, CLUBS_SHORT, 4, "zs_cl_", 1)
+        st.markdown("#### Bastone")
+        cols = st.columns(4)
+        for i, cl in enumerate(CLUBS_SHORT):
+            if cols[i % 4].button(cl, key=f"scl{i}"):
+                shot["Club"] = cl
+                st.session_state["wz_step"] = 1
+                st.rerun()
     elif step == 1:
-        step_badge(2, total, "Distanza iniziale")
-        distance_input("Distanza iniziale dalla buca (m)", "wz_short_start", 0.0, 50.0, 0.5, [5, 10, 15, 20, 30, 40], default=20.0)
-        if st.button("Conferma distanza iniziale", type="primary", use_container_width=True):
-            shot["Start_Dist_m"] = read_distance("wz_short_start", 20.0)
+        distance_input(
+            "Distanza iniziale dalla buca (metri)",
+            "wz_short_start",
+            0.0,
+            50.0,
+            0.5,
+            [5, 10, 20, 30, 40],
+        )
+        if st.button("Conferma distanza", use_container_width=True):
+            shot["Start_Dist_m"] = read_distance("wz_short_start", 0.0)
             st.session_state["wz_step"] = 2
             st.rerun()
     elif step == 2:
-        step_badge(3, total, "Lie iniziale")
-        cols = st.columns(2)
-        for i, opt in enumerate(SHORT_LIE_START):
-            if cols[i % 2].button(opt, key=f"zs_ls_{i}", use_container_width=True):
+        st.markdown("#### Lie iniziale")
+        for opt in SHORT_LIE_START:
+            if st.button(opt, key=f"ls{opt}", use_container_width=True):
                 shot["Lie_Start"] = opt
                 st.session_state["wz_step"] = 3
                 st.rerun()
     elif step == 3:
-        step_badge(4, total, "Distanza finale")
-        distance_input("Distanza finale dalla buca (m)", "wz_short_end", 0.0, 80.0, 0.5, [0, 1, 2, 4, 8, 15], default=4.0)
-        if st.button("Conferma distanza finale", type="primary", use_container_width=True):
-            shot["End_Dist_m"] = read_distance("wz_short_end", 4.0)
+        distance_input(
+            "Distanza finale dalla buca (metri)",
+            "wz_short_end",
+            0.0,
+            80.0,
+            0.5,
+            [0, 1, 2, 4, 8],
+        )
+        if st.button("Conferma distanza finale", use_container_width=True):
+            shot["End_Dist_m"] = read_distance("wz_short_end", 0.0)
             st.session_state["wz_step"] = 4
             st.rerun()
     elif step == 4:
-        step_badge(5, total, "Lie finale")
-        cols = st.columns(2)
-        for i, opt in enumerate(SHORT_LIE_END):
-            if cols[i % 2].button(opt, key=f"zs_le_{i}", use_container_width=True):
+        st.markdown("#### Lie finale")
+        for opt in SHORT_LIE_END:
+            if st.button(opt, key=f"le{opt}", use_container_width=True):
                 shot["Lie_End"] = opt
                 st.session_state["wz_step"] = 5
                 st.rerun()
     elif step == 5:
-        step_badge(6, total, "Impatto")
+        st.markdown("#### Impatto")
         for opt in SHORT_IMPACT:
-            if st.button(opt, key=f"zs_im_{opt}", use_container_width=True):
-                _pick_option(shot, "Impact", opt, 6, {"Curvature": ""})
+            if st.button(opt, key=f"sim{opt}", use_container_width=True):
+                shot["Impact"] = opt
+                shot["Curvature"] = ""
+                st.session_state["wz_step"] = 6
+                st.rerun()
     elif step == 6:
-        step_badge(7, total, "Direzione")
+        st.markdown("#### Direzione rispetto alla buca")
         for opt in SHORT_DIR:
-            if st.button(opt, key=f"zs_dir_{opt}", use_container_width=True):
-                _pick_option(shot, "Direction_LR", opt, 7)
+            if st.button(opt, key=f"sd{opt}", use_container_width=True):
+                shot["Direction_LR"] = opt
+                st.session_state["wz_step"] = 7
+                st.rerun()
     elif step == 7:
-        step_badge(8, total, "Errore laterale")
-        distance_input("Metri a destra/sinistra dalla buca", "wz_short_lat", 0.0, 80.0, 0.5, [0, 1, 2, 4, 8])
-        if st.button("Conferma laterale", type="primary", use_container_width=True):
-            shot["Proximity_Lateral_m"] = lat_sign(str(shot.get("Direction_LR", "")), read_distance("wz_short_lat", 0.0))
+        distance_input(
+            "Metri a destra/sinistra dalla buca",
+            "wz_short_lat",
+            0.0,
+            80.0,
+            0.5,
+            [0, 1, 2, 4, 8],
+        )
+        if st.button("Conferma errore laterale", use_container_width=True):
+            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], read_distance("wz_short_lat", 0.0))
             st.session_state["wz_step"] = 8
             st.rerun()
     elif step == 8:
-        step_badge(9, total, "Profondità")
-        distance_input("Metri corto/lungo", "wz_short_depth", 0.0, 80.0, 0.5, [0, 1, 2, 4, 8])
-        sense = st.radio("Senso", ["In linea", "Corto", "Lungo"], horizontal=True)
+        distance_input(
+            "Metri corto/lungo rispetto alla buca",
+            "wz_short_depth",
+            0.0,
+            80.0,
+            0.5,
+            [0, 1, 2, 4, 8],
+        )
+        sense = st.radio("Senso", ["In linea", "Corto", "Lungo"])
         conv = {"In linea": "In linea col bersaglio", "Corto": "Corto del bersaglio", "Lungo": "Lungo del bersaglio"}
-        if st.button("Conferma profondità", type="primary", use_container_width=True):
+        if st.button("Conferma profondità", use_container_width=True):
             shot["Proximity_Depth_m"] = depth_sign(read_distance("wz_short_depth", 0.0), conv[sense])
             st.session_state["wz_step"] = 9
             st.rerun()
     elif step == 9:
-        step_badge(10, total, "Voto 1–5")
+        st.markdown("#### Voto (1–5)")
         cols = st.columns(5)
         for v in range(1, 6):
-            if cols[v - 1].button(str(v), key=f"zs_rt_{v}", use_container_width=True):
+            if cols[v - 1].button(str(v), key=f"sv{v}"):
                 shot["Rating"] = v
                 st.session_state["wz_step"] = 10
                 st.rerun()
     elif step == 10:
-        step_badge(11, total, "Reazione mentale")
-        cols = st.columns(2)
-        for i, opt in enumerate(MENTAL_OPTIONS):
-            if cols[i % 2].button(opt, key=f"zs_mn_{opt}", use_container_width=True):
+        st.markdown("#### Reazione mentale")
+        for opt in MENTAL_OPTIONS:
+            if st.button(opt, key=f"smn{opt}", use_container_width=True):
                 shot["Mental_Reaction"] = opt
-        if st.button("Salva gioco corto", type="primary", use_container_width=True):
-            if "Mental_Reaction" not in shot:
-                st.error("Seleziona prima la reazione mentale.")
-                return
-            start_m = float(shot.get("Start_Dist_m", read_distance("wz_short_start", 0)))
-            end_m = float(shot.get("End_Dist_m", read_distance("wz_short_end", 0)))
-            sg = compute_sg_short(start_m, end_m, str(shot.get("Lie_Start", "")), str(shot.get("Lie_End", "")))
+                st.session_state["wz_step"] = 11
+                st.rerun()
+    elif step == 11:
+        st.markdown("#### Strokes gained (usa distanze e lie già inseriti)")
+        if st.button("Calcola e salva colpo", type="primary", use_container_width=True):
+            start_m = float(shot.get("Start_Dist_m", read_distance("wz_short_start", 0.0)))
+            end_m = float(shot.get("End_Dist_m", read_distance("wz_short_end", 0.0)))
+            sg = compute_sg_short(start_m, end_m, str(shot["Lie_Start"]), str(shot["Lie_End"]))
             row = {
                 "User": user,
                 "Date": datetime.date.today(),
@@ -1648,7 +1511,6 @@ def wizard_short(session_name: str, user: str) -> None:
             st.success("Gioco corto salvato.")
             reset_wizard()
             st.rerun()
-
     if st.button("Annulla inserimento", key="cancel_s"):
         reset_wizard()
         st.rerun()
@@ -1658,59 +1520,69 @@ def wizard_putt(session_name: str, user: str) -> None:
     st.session_state.setdefault("wz_step", 0)
     step = st.session_state["wz_step"]
     shot: dict[str, Any] = st.session_state.setdefault("wz_payload", {})
-    total = 6
 
     if step == 0:
-        step_badge(1, total, "Distanza iniziale")
-        distance_input("Distanza iniziale (m)", "wz_putt_start", 0.0, 60.0, 0.1, [0.5, 1, 2, 3, 4, 8], default=2.0)
-        if st.button("Avanti", type="primary", use_container_width=True):
-            shot["Start_Dist_m"] = read_distance("wz_putt_start", 2.0)
+        distance_input(
+            "Distanza iniziale dalla buca (metri)",
+            "wz_putt_start",
+            0.0,
+            60.0,
+            0.1,
+            [0.5, 1, 2, 4, 8],
+        )
+        if st.button("Avanti", use_container_width=True):
+            shot["Start_Dist_m"] = read_distance("wz_putt_start", 0.0)
             st.session_state["wz_step"] = 1
             st.rerun()
     elif step == 1:
-        step_badge(2, total, "Distanza finale")
-        distance_input("Distanza finale — 0 se in buca", "wz_putt_end", 0.0, 30.0, 0.05, [0, 0.3, 0.6, 1.0, 2.0], default=0.0)
-        if st.button("Conferma distanze", type="primary", use_container_width=True):
-            shot["Start_Dist_m"] = read_distance("wz_putt_start", shot.get("Start_Dist_m", 2.0))
+        distance_input(
+            "Distanza finale (0 se in buca)",
+            "wz_putt_end",
+            0.0,
+            30.0,
+            0.05,
+            [0, 0.3, 0.6, 1.0, 2.0],
+        )
+        if st.button("Conferma distanze", use_container_width=True):
+            shot["Start_Dist_m"] = read_distance("wz_putt_start", shot.get("Start_Dist_m", 0.0))
             shot["End_Dist_m"] = read_distance("wz_putt_end", 0.0)
             st.session_state["wz_step"] = 2
             st.rerun()
     elif step == 2:
-        step_badge(3, total, "Impatto")
-        cols = st.columns(2)
-        for i, opt in enumerate(PUTT_IMPACT):
-            if cols[i % 2].button(opt, key=f"zp_im_{opt}", use_container_width=True):
+        st.markdown("#### Impatto sulla faccia")
+        for opt in PUTT_IMPACT:
+            if st.button(opt, key=f"pi{opt}", use_container_width=True):
                 shot["Impact"] = opt
                 st.session_state["wz_step"] = 3
                 st.rerun()
     elif step == 3:
-        step_badge(4, total, "Traiettoria")
+        st.markdown("#### Traiettoria")
         for opt in PUTT_TRAJ:
-            if st.button(opt, key=f"zp_tr_{opt}", use_container_width=True):
+            if st.button(opt, key=f"pt{opt}", use_container_width=True):
                 shot["Trajectory"] = opt
                 shot["Curvature"] = opt
                 st.session_state["wz_step"] = 4
                 st.rerun()
     elif step == 4:
-        step_badge(5, total, "Voto")
+        st.markdown("#### Voto (1–5)")
         cols = st.columns(5)
         for v in range(1, 6):
-            if cols[v - 1].button(str(v), key=f"zp_rt_{v}", use_container_width=True):
+            if cols[v - 1].button(str(v), key=f"pv{v}"):
                 shot["Rating"] = v
                 st.session_state["wz_step"] = 5
                 st.rerun()
     elif step == 5:
-        step_badge(6, total, "Mentale e salva")
-        cols = st.columns(2)
-        for i, opt in enumerate(MENTAL_OPTIONS):
-            if cols[i % 2].button(opt, key=f"zp_mn_{opt}", use_container_width=True):
+        st.markdown("#### Reazione mentale")
+        for opt in MENTAL_OPTIONS:
+            if st.button(opt, key=f"pmn{opt}", use_container_width=True):
                 shot["Mental_Reaction"] = opt
-        if st.button("Salva putt", type="primary", use_container_width=True):
-            if "Mental_Reaction" not in shot:
-                st.error("Seleziona la reazione mentale.")
-                return
-            start_m = float(shot.get("Start_Dist_m", read_distance("wz_putt_start", 0)))
-            end_m = float(shot.get("End_Dist_m", read_distance("wz_putt_end", 0)))
+                st.session_state["wz_step"] = 6
+                st.rerun()
+    elif step == 6:
+        st.markdown("#### Salva putt (strokes gained dal primo putt)")
+        if st.button("Calcola SG e salva", type="primary", use_container_width=True):
+            start_m = float(shot.get("Start_Dist_m", read_distance("wz_putt_start", 0.0)))
+            end_m = float(shot.get("End_Dist_m", read_distance("wz_putt_end", 0.0)))
             sg = compute_sg_putt(start_m, end_m)
             row = {
                 "User": user,
@@ -1740,7 +1612,6 @@ def wizard_putt(session_name: str, user: str) -> None:
             st.success("Putt salvato.")
             reset_wizard()
             st.rerun()
-
     if st.button("Annulla inserimento", key="cancel_p"):
         reset_wizard()
         st.rerun()
@@ -1754,8 +1625,13 @@ def review_panel(user: str, session_name: str) -> None:
     df_u = df_all[df_all["User"] == user]
     render_hero(
         "Review performance",
-        "Dashboard con grafici, SG e tabelle per periodo e settore.",
-        ["Pie charts", "Dispersione", "Strokes Gained", "Trend"],
+        "Seleziona settore e periodo per aprire una dashboard completa con grafici, SG e tabelle.",
+        ["Pie charts", "Dispersione", "Strokes Gained", "Trend", "Putting make%"],
+    )
+    st.markdown("### Review — statistiche")
+    render_panel(
+        "Filtro analisi",
+        "Scegli prima periodo e settore. La dashboard sotto si aggiorna in tempo reale.",
     )
     period = st.selectbox("Periodo", PERIOD_LABELS, key="rev_period")
     df_f = filter_period(df_u, session_name, period)
@@ -1767,7 +1643,10 @@ def review_panel(user: str, session_name: str) -> None:
         key="rev_sector",
     )
     dsec = df_f[df_f["Category"] == sector]
-    st.caption(f"Utente **{user}** · **{period}** · **{CATEGORIES[sector]}** · n = **{len(dsec)}**")
+    st.caption(
+        f"Utente **{user}** · periodo **{period}** · settore **{CATEGORIES[sector]}** · "
+        f"n = **{len(dsec)}** colpi."
+    )
 
     if dsec.empty:
         st.info("Nessun colpo in questo filtro.")
@@ -1775,21 +1654,87 @@ def review_panel(user: str, session_name: str) -> None:
         return
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("Colpi", len(dsec))
+    m1.metric("Colpi registrati", len(dsec))
     rmean = pd.to_numeric(dsec["Rating"], errors="coerce").mean()
     m2.metric("Voto medio", f"{rmean:.2f}" if pd.notna(rmean) else "—")
     sg_series = pd.to_numeric(dsec["Strokes_Gained"], errors="coerce").dropna()
     m3.metric("SG medio", f"{sg_series.mean():+.3f}" if len(sg_series) else "—")
 
+    st.markdown("#### Tabelle schematiche di review")
     shots_cols = [
-        "Date", "Time", "SessionName", "Category", "Club", "Impact", "Curvature",
-        "Direction_LR", "Proximity_Lateral_m", "Proximity_Depth_m", "Rating", "Strokes_Gained",
+        "Date",
+        "Time",
+        "SessionName",
+        "Category",
+        "Club",
+        "Impact",
+        "Curvature",
+        "Trajectory",
+        "Direction_LR",
+        "Proximity_Lateral_m",
+        "Proximity_Depth_m",
+        "Rating",
+        "Strokes_Gained",
     ]
-    st.dataframe(
-        dsec[[c for c in shots_cols if c in dsec.columns]].sort_values(["Date", "Time"], ascending=False),
-        use_container_width=True,
-        hide_index=True,
+    shots_table = (
+        dsec[[c for c in shots_cols if c in dsec.columns]]
+        .sort_values(by=["Date", "Time"], ascending=False)
+        .reset_index(drop=True)
     )
+    st.caption("Dettaglio colpo per colpo (settore selezionato).")
+    st.dataframe(shots_table, use_container_width=True, hide_index=True)
+
+    avg_by_cat = (
+        df_f.groupby("Category", dropna=False)
+        .agg(
+            Colpi=("Rating", "count"),
+            Media_Voto=("Rating", "mean"),
+            Media_SG=("Strokes_Gained", "mean"),
+        )
+        .reset_index()
+    )
+    avg_by_cat["Category"] = avg_by_cat["Category"].map(CATEGORIES).fillna(avg_by_cat["Category"])
+    avg_by_cat["Media_Voto"] = pd.to_numeric(avg_by_cat["Media_Voto"], errors="coerce").round(2)
+    avg_by_cat["Media_SG"] = pd.to_numeric(avg_by_cat["Media_SG"], errors="coerce").round(3)
+    st.caption("Medie per area (periodo selezionato).")
+    st.dataframe(avg_by_cat, use_container_width=True, hide_index=True)
+
+    avg_by_club = (
+        dsec.groupby("Club", dropna=False)
+        .agg(
+            Colpi=("Rating", "count"),
+            Media_Voto=("Rating", "mean"),
+            Media_SG=("Strokes_Gained", "mean"),
+        )
+        .reset_index()
+        .sort_values(by=["Colpi", "Club"], ascending=[False, True])
+    )
+    avg_by_club["Media_Voto"] = pd.to_numeric(avg_by_club["Media_Voto"], errors="coerce").round(2)
+    avg_by_club["Media_SG"] = pd.to_numeric(avg_by_club["Media_SG"], errors="coerce").round(3)
+    st.caption("Medie per colpo/bastone nel settore selezionato.")
+    st.dataframe(avg_by_club, use_container_width=True, hide_index=True)
+
+    no_short = df_f[df_f["Category"] != "SHORT"]
+    comp_avg = pd.DataFrame(
+        [
+            {
+                "Vista media": "Con SG inclusi (tutte le categorie)",
+                "Colpi": len(df_f),
+                "Media Voto": pd.to_numeric(df_f["Rating"], errors="coerce").mean(),
+                "Media SG": pd.to_numeric(df_f["Strokes_Gained"], errors="coerce").mean(),
+            },
+            {
+                "Vista media": "Con SG esclusi (senza SHORT)",
+                "Colpi": len(no_short),
+                "Media Voto": pd.to_numeric(no_short["Rating"], errors="coerce").mean(),
+                "Media SG": pd.to_numeric(no_short["Strokes_Gained"], errors="coerce").mean(),
+            },
+        ]
+    )
+    comp_avg["Media Voto"] = pd.to_numeric(comp_avg["Media Voto"], errors="coerce").round(2)
+    comp_avg["Media SG"] = pd.to_numeric(comp_avg["Media SG"], errors="coerce").round(3)
+    st.caption("Confronto medie SG inclusi / non inclusi.")
+    st.dataframe(comp_avg, use_container_width=True, hide_index=True)
 
     sg_summary_table(df_f, sector)
     trend_panel(dsec, CATEGORIES[sector])
@@ -1799,17 +1744,50 @@ def review_panel(user: str, session_name: str) -> None:
         directional_bias_panel(dsec)
 
     if sector == "RANGE":
-        plot_pie(dsec, "Impact", "Impatto", "Legenda impatti.")
-        plot_pie(dsec, "Curvature", "Curvatura", "Legenda curvatura.")
-        plot_dispersion(dsec, "Dispersione RANGE")
+        render_panel(
+            "Analisi tecnica range",
+            "Impatti, curvatura, direzione e dispersione per identificare pattern e bias di traiettoria.",
+        )
+        plot_pie(
+            dsec,
+            "Impact",
+            "Tipologia di impatto — percentuali",
+            "Legenda: ripartizione percentuale degli impatti dichiarati.",
+        )
+        plot_pie(
+            dsec,
+            "Curvature",
+            "Curvatura — percentuali",
+            "Legenda: forma di volo predominante nel campione.",
+        )
+        plot_pie(
+            dsec,
+            "Direction_LR",
+            "Tendenza direzionale vs bersaglio",
+            "Legenda: orientamento medio rispetto alla linea di punteria.",
+        )
+        plot_dispersion(dsec, "Dispersione dall’alto — RANGE")
         satisfaction_breakdown(df_f, "RANGE")
+
     elif sector == "SHORT":
-        plot_pie(dsec, "Lie_Start", "Lie iniziale", "")
-        plot_pie(dsec, "Impact", "Impatto", "")
-        plot_dispersion(dsec, "Dispersione gioco corto")
+        render_panel(
+            "Analisi tecnica gioco corto",
+            "Confronta lie iniziale/finale, contatto e direzione per leggere conversione e qualità d'esecuzione.",
+        )
+        plot_pie(dsec, "Lie_Start", "Lie iniziale", "Legenda: da dove parte la palla più spesso.")
+        plot_pie(dsec, "Lie_End", "Lie finale", "Legenda: dove finisce la palla dopo il colpo.")
+        plot_pie(dsec, "Impact", "Impatto", "Legenda: qualità di contatto dichiarata.")
+        plot_pie(dsec, "Direction_LR", "Linea vs buca", "Legenda: tendenza destra/sinistra.")
+        plot_dispersion(dsec, "Dispersione dall’alto — gioco corto")
         satisfaction_breakdown(df_f, "SHORT")
+
     else:
-        plot_pie(dsec, "Impact", "Impatto putter", "")
+        render_panel(
+            "Analisi putting",
+            "Contatto faccia, linea e percentuali realizzazione per fascia distanza.",
+        )
+        plot_pie(dsec, "Impact", "Impatto sulla faccia", "Legenda: zona di contatto sul putter.")
+        plot_pie(dsec, "Trajectory", "Traiettoria di rotazione", "Legenda: pull/dritta/push.")
         putting_make_table(dsec)
         satisfaction_breakdown(df_f, "PUTT")
 
@@ -1855,26 +1833,28 @@ def main() -> None:
         horizontal=True,
         key="main_page_home",
     )
-    _, c_logout = st.columns([3, 1])
-    with c_logout:
-        if st.button("Logout", use_container_width=True):
+    c_logout_1, c_logout_2 = st.columns([3, 1])
+    with c_logout_2:
+        if st.button("Logout / cambia utente", use_container_width=True):
             st.session_state["logged_in"] = False
+            st.session_state["post_auth_logo_pending"] = False
             st.session_state.pop("user", None)
             st.rerun()
 
     render_command_header(page)
 
     if page == "Inserimento dati":
+        brand_header("Inserimento rapido")
         render_hero(
-            "Inserimento rapido",
-            "Pulsanti grandi, preset distanza affidabili, meno conferme ridondanti.",
+            "Sessione di raccolta dati",
+            "Input veloce a step singoli con pulsanti grandi, pensato per utilizzo smartphone sul campo pratica.",
             ["Range", "Short game", "Putting"],
         )
         st.session_state.setdefault("wz_cat", None)
         if st.session_state["wz_cat"] is None:
             st.markdown("#### Scegli il settore")
             c1, c2, c3 = st.columns(3)
-            if c1.button("RANGE\n(gioco lungo)", use_container_width=True):
+            if c1.button("Range\n(gioco lungo)", use_container_width=True):
                 reset_wizard()
                 st.session_state["wz_cat"] = "RANGE"
                 st.rerun()
@@ -1889,7 +1869,7 @@ def main() -> None:
             brand_footer()
         else:
             st.caption(f"Sessione: **{session_name}**")
-            if st.button("← Cambia settore"):
+            if st.button("Torna alla scelta settore"):
                 reset_wizard()
                 st.session_state["wz_cat"] = None
                 st.rerun()
@@ -1913,4 +1893,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+    
 
