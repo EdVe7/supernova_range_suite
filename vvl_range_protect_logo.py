@@ -1,13 +1,12 @@
+
 """
-Zanardelli Range Suite — tracking allenamento (range, gioco corto, putting).
-UI mobile-first, persistenza Google Sheets, export Diario di Gioco (PDF).
+Supernova Range Suite — tracking allenamento (range, gioco corto, putting).
+UI mobile-first, tema bianco/oro, persistenza Google Sheets. Nessun export PDF.
 """
 
 from __future__ import annotations
 
 import datetime
-import html as html_lib
-import io
 import time
 from typing import Any
 
@@ -22,25 +21,11 @@ try:
 except ImportError:  # pragma: no cover
     from streamlit_gsheets import GSheetsConnection  # type: ignore
 
-try:
-    from reportlab.lib import colors as rl_colors
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-    from reportlab.lib.units import cm
-    from reportlab.platypus import Image as RLImage
-    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-
-    HAS_REPORTLAB = True
-except ImportError:
-    HAS_REPORTLAB = False
-
 # =============================================================================
 # Config pagina
 # =============================================================================
-APP_NAME = "Zanardelli Range Suite"
-
 st.set_page_config(
-    page_title=APP_NAME,
+    page_title="Supernova Range Suite",
     page_icon="⛳",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -175,17 +160,6 @@ PERIOD_LABELS = [
     "Lifelong",
 ]
 
-NUMERIC_AVG_FIELDS = [
-    ("Proximity_Lateral_m", "Err. laterale (m)"),
-    ("Proximity_Depth_m", "Err. profondità (m)"),
-    ("Start_Dist_m", "Distanza inizio (m)"),
-    ("End_Dist_m", "Distanza fine (m)"),
-    ("Hole_Dist_Start_m", "Dist. buca inizio (m)"),
-    ("Hole_Dist_End_m", "Dist. buca fine (m)"),
-    ("Rating", "Voto medio"),
-    ("Strokes_Gained", "SG medio"),
-]
-
 
 def inject_styles() -> None:
     st.markdown(
@@ -270,8 +244,8 @@ def inject_styles() -> None:
         font-weight: 800 !important;
     }}
     div[data-testid="stHorizontalBlock"] button {{
-        min-height: 3.65rem !important;
-        font-size: 1.06rem !important;
+        min-height: 3.15rem !important;
+        font-size: 1rem !important;
         border-radius: 14px !important;
         border: 1px solid #d7ddeb !important;
         background: {WHITE} !important;
@@ -416,7 +390,7 @@ def brand_header(title: str | None = None) -> None:
             st.image("logo.png", use_container_width=True)
         except Exception:
             st.markdown(
-                f"<div style='font-size:1.6rem;font-weight:800;color:{GOLD};'>{APP_NAME}</div>",
+                f"<div style='font-size:1.6rem;font-weight:800;color:{GOLD};'>SUPERNOVA</div>",
                 unsafe_allow_html=True,
             )
     with c2:
@@ -430,12 +404,7 @@ def brand_header(title: str | None = None) -> None:
 
 def brand_footer() -> None:
     st.markdown(
-        (
-            "<div class='sn-footer'>"
-            f"<strong>© {datetime.date.today().year} Andrea Zanardelli</strong><br>"
-            "Co-designed by Andrea Zanardelli and Edoardo Venturoli"
-            "</div>"
-        ),
+        "<div class='sn-footer'>Powered by Supernova Sport Science</div>",
         unsafe_allow_html=True,
     )
 
@@ -472,21 +441,13 @@ def render_command_header(page: str) -> None:
     st.markdown(
         (
             "<div class='sn-panel'>"
-            f"<div class='sn-panel-title'>{APP_NAME} — Command Center</div>"
+            "<div class='sn-panel-title'>Supernova Coach Command Center</div>"
             f"<p class='sn-panel-sub'>Sezione attiva: <b>{page}</b> · "
             "UI ottimizzata per lettura rapida coach-atleta in campo.</p>"
             "</div>"
         ),
         unsafe_allow_html=True,
     )
-
-
-def _set_distance(key: str, value: float) -> None:
-    st.session_state[key] = float(value)
-
-
-def read_distance(key: str, default: float = 0.0) -> float:
-    return float(st.session_state.get(key, default))
 
 
 def distance_input(
@@ -496,30 +457,24 @@ def distance_input(
     max_value: float,
     step: float,
     presets: list[float] | None = None,
-) -> None:
-    """Mostra campo + preset. Leggere il valore con read_distance() al conferma/salva."""
-    if key not in st.session_state:
-        st.session_state[key] = float(min_value)
+) -> float:
     st.markdown(f"**{label}**")
-    st.number_input(
+    value = st.number_input(
         "metri",
-        min_value=float(min_value),
-        max_value=float(max_value),
-        step=float(step),
+        min_value=min_value,
+        max_value=max_value,
+        step=step,
         key=key,
         label_visibility="collapsed",
     )
     if presets:
         st.caption("Preset rapidi")
-        cols = st.columns(min(len(presets), 6))
-        for i, p in enumerate(presets[:6]):
-            cols[i].button(
-                f"{p:g} m",
-                key=f"{key}_p{i}",
-                use_container_width=True,
-                on_click=_set_distance,
-                args=(key, float(p)),
-            )
+        cols = st.columns(min(len(presets), 5))
+        for i, p in enumerate(presets[:5]):
+            if cols[i].button(f"{p:g} m", key=f"{key}_p{i}", use_container_width=True):
+                st.session_state[key] = float(p)
+                st.rerun()
+    return float(st.session_state.get(key, value))
 
 
 # =============================================================================
@@ -648,149 +603,6 @@ def save_shot(row: dict[str, Any]) -> None:
     merged = align_dataframe(pd.concat([existing, new], ignore_index=True))
     conn.update(data=merged)
     st.cache_data.clear()
-
-
-def session_shots(df: pd.DataFrame, user: str, session_name: str) -> pd.DataFrame:
-    if df.empty:
-        return df
-    return df[(df["User"] == user) & (df["SessionName"] == session_name)].sort_values(
-        by=["Date", "Time"], ascending=[True, True]
-    )
-
-
-def _mode_or_dash(series: pd.Series) -> str:
-    s = series.dropna().astype(str)
-    s = s[(s != "") & (s != "nan")]
-    if s.empty:
-        return "—"
-    return str(s.mode().iloc[0])
-
-
-def club_summary_for_diario(df: pd.DataFrame) -> tuple[list[str], list[list[str]]]:
-    if df.empty:
-        return [], []
-    clubs = (
-        df.groupby("Club", dropna=False)
-        .size()
-        .sort_values(ascending=False)
-        .index.astype(str)
-        .tolist()
-    )
-    header = ["Metrica"] + clubs
-    rows: list[list[str]] = [["N° colpi"] + [str(int((df["Club"] == cl).sum())) for cl in clubs]]
-    for field, label in NUMERIC_AVG_FIELDS:
-        row = [label]
-        for cl in clubs:
-            vals = pd.to_numeric(df.loc[df["Club"] == cl, field], errors="coerce").dropna()
-            if vals.empty:
-                row.append("—")
-            elif field == "Strokes_Gained":
-                row.append(f"{vals.mean():+.3f}")
-            elif field == "Rating":
-                row.append(f"{vals.mean():.2f}")
-            else:
-                row.append(f"{vals.mean():.2f}")
-        rows.append(row)
-    for field, label in [
-        ("Impact", "Impatto più frequente"),
-        ("Curvature", "Curvatura più frequente"),
-        ("Direction_LR", "Direzione più frequente"),
-        ("Mental_Reaction", "Reazione mentale più frequente"),
-    ]:
-        row = [label]
-        for cl in clubs:
-            row.append(_mode_or_dash(df.loc[df["Club"] == cl, field]))
-        rows.append(row)
-    return header, rows
-
-
-def build_diario_pdf(df_session: pd.DataFrame, user: str, session_name: str) -> bytes | None:
-    if not HAS_REPORTLAB:
-        return None
-    buf = io.BytesIO()
-    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.4 * cm, rightMargin=1.4 * cm, topMargin=1.2 * cm, bottomMargin=1.2 * cm)
-    styles = getSampleStyleSheet()
-    title_style = ParagraphStyle("ZTitle", parent=styles["Heading1"], fontSize=18, textColor=rl_colors.HexColor(TEXT))
-    sub_style = ParagraphStyle("ZSub", parent=styles["Normal"], fontSize=10, textColor=rl_colors.HexColor(MUTED))
-    story: list[Any] = []
-    try:
-        logo = RLImage("logo.png", width=3.2 * cm, height=3.2 * cm)
-        logo.hAlign = "LEFT"
-        story.append(logo)
-    except Exception:
-        pass
-    story.append(Paragraph("Diario di Gioco", title_style))
-    story.append(Paragraph(f"<b>{html_lib.escape(APP_NAME)}</b>", sub_style))
-    now = datetime.datetime.now()
-    times = df_session["Time"].dropna().astype(str).tolist() if not df_session.empty else []
-    t_range = f"{times[0]} – {times[-1]}" if len(times) >= 2 else (times[0] if times else now.strftime("%H:%M"))
-    cats = df_session["Category"].dropna().unique().tolist() if not df_session.empty else []
-    cat_txt = ", ".join(CATEGORIES.get(c, c) for c in cats) if cats else "—"
-    meta = [
-        ["Atleta", user], ["Sessione", session_name],
-        ["Data", datetime.date.today().strftime("%d/%m/%Y")],
-        ["Ora / intervallo", t_range], ["Settori", cat_txt],
-        ["Colpi totali", str(len(df_session))], ["Generato il", now.strftime("%d/%m/%Y %H:%M")],
-    ]
-    mt = Table(meta, colWidths=[4.5 * cm, 12 * cm])
-    mt.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, -1), 9),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    story.extend([mt, Spacer(1, 0.5 * cm)])
-    header, rows = club_summary_for_diario(df_session)
-    if header:
-        story.append(Paragraph("Statistiche medie per bastone", styles["Heading2"]))
-        n_clubs = max(len(header) - 1, 1)
-        tbl = Table([header] + rows, colWidths=[4.2 * cm] + [max(2.0 * cm, 16.0 * cm / n_clubs)] * n_clubs)
-        tbl.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), rl_colors.HexColor(ORANGE)),
-            ("TEXTCOLOR", (0, 0), (-1, 0), rl_colors.white),
-            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("ALIGN", (0, 1), (0, -1), "LEFT"),
-            ("GRID", (0, 0), (-1, -1), 0.5, rl_colors.HexColor(CARD_BORDER)),
-        ]))
-        story.append(tbl)
-    story.append(Spacer(1, 0.5 * cm))
-    story.append(Paragraph("© Andrea Zanardelli · Co-designed by Andrea Zanardelli and Edoardo Venturoli", sub_style))
-    doc.build(story)
-    buf.seek(0)
-    return buf.read()
-
-
-def diario_panel(user: str, session_name: str) -> None:
-    render_hero(
-        "Diario di Gioco",
-        "PDF tabellare con medie per bastone della sessione corrente.",
-        ["PDF", "Medie per bastone"],
-    )
-    df_sess = session_shots(load_data(), user, session_name)
-    if df_sess.empty:
-        st.info("Registra almeno un colpo in questa sessione.")
-        brand_footer()
-        return
-    header, rows = club_summary_for_diario(df_sess)
-    if header:
-        st.dataframe(pd.DataFrame(rows, columns=header), use_container_width=True, hide_index=True)
-    if not HAS_REPORTLAB:
-        st.error("PDF non disponibile: installa reportlab sul server (`pip install reportlab`).")
-        brand_footer()
-        return
-    pdf_bytes = build_diario_pdf(df_sess, user, session_name)
-    if pdf_bytes:
-        safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in session_name)[:40]
-        st.download_button(
-            "Scarica Diario di Gioco (PDF)",
-            data=pdf_bytes,
-            file_name=f"Diario_Gioco_{user}_{safe}_{datetime.date.today():%Y%m%d}.pdf",
-            mime="application/pdf",
-            type="primary",
-            use_container_width=True,
-        )
-    brand_footer()
 
 
 # =============================================================================
@@ -1263,7 +1075,7 @@ def wizard_range(session_name: str, user: str) -> None:
                 st.rerun()
     elif step == 4:
         st.markdown("#### Errore laterale (metri assoluti)")
-        distance_input(
+        lat = distance_input(
             "Metri a destra/sinistra dal punto mirato",
             "wz_range_lat",
             0.0,
@@ -1272,12 +1084,12 @@ def wizard_range(session_name: str, user: str) -> None:
             [0, 2, 5, 10, 20],
         )
         if st.button("Conferma errore laterale", use_container_width=True):
-            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], read_distance("wz_range_lat", 0.0))
+            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], lat)
             st.session_state["wz_step"] = 5
             st.rerun()
     elif step == 5:
         st.markdown("#### Errore in profondità (per mappa dall’alto)")
-        distance_input(
+        depth_amt = distance_input(
             "Quanti metri corto/lungo?",
             "wz_range_depth",
             0.0,
@@ -1287,7 +1099,7 @@ def wizard_range(session_name: str, user: str) -> None:
         )
         sense = st.radio("Senso", ["In linea col bersaglio", "Corto del bersaglio", "Lungo del bersaglio"])
         if st.button("Conferma profondità", use_container_width=True):
-            shot["Proximity_Depth_m"] = depth_sign(read_distance("wz_range_depth", 0.0), sense)
+            shot["Proximity_Depth_m"] = depth_sign(depth_amt, sense)
             st.session_state["wz_step"] = 6
             st.rerun()
     elif step == 6:
@@ -1308,7 +1120,7 @@ def wizard_range(session_name: str, user: str) -> None:
     elif step == 8:
         st.markdown("#### Dati per Strokes Gained — gioco lungo")
         shot["Lie_Long"] = st.radio("Lie di partenza", ["Tee", "Fairway"])
-        distance_input(
+        shot["Hole_Dist_Start_m"] = distance_input(
             "Distanza dalla buca prima del colpo (metri)",
             "wz_range_hole_start",
             0.0,
@@ -1316,7 +1128,7 @@ def wizard_range(session_name: str, user: str) -> None:
             1.0,
             [40, 80, 120, 160, 200],
         )
-        distance_input(
+        shot["Hole_Dist_End_m"] = distance_input(
             "Distanza dalla buca dopo il colpo (metri)",
             "wz_range_hole_end",
             0.0,
@@ -1329,10 +1141,13 @@ def wizard_range(session_name: str, user: str) -> None:
             ["Fairway", "First cut", "Semi-rough", "Rough", "Bunker", "Fringe", "Green"],
         )
         if st.button("Calcola e salva colpo", type="primary", use_container_width=True):
-            hole_start = read_distance("wz_range_hole_start", 0.0)
-            hole_end = read_distance("wz_range_hole_end", 0.0)
             from_tee = shot["Lie_Long"] == "Tee"
-            sg = compute_sg_long(hole_start, hole_end, from_tee, lie_after)
+            sg = compute_sg_long(
+                float(shot["Hole_Dist_Start_m"]),
+                float(shot["Hole_Dist_End_m"]),
+                from_tee,
+                lie_after,
+            )
             row = {
                 "User": user,
                 "Date": datetime.date.today(),
@@ -1348,10 +1163,10 @@ def wizard_range(session_name: str, user: str) -> None:
                 "Direction_LR": shot.get("Direction_LR", ""),
                 "Proximity_Lateral_m": shot.get("Proximity_Lateral_m", np.nan),
                 "Proximity_Depth_m": shot.get("Proximity_Depth_m", np.nan),
-                "Start_Dist_m": hole_start,
-                "End_Dist_m": hole_end,
-                "Hole_Dist_Start_m": hole_start,
-                "Hole_Dist_End_m": hole_end,
+                "Start_Dist_m": shot.get("Hole_Dist_Start_m", np.nan),
+                "End_Dist_m": shot.get("Hole_Dist_End_m", np.nan),
+                "Hole_Dist_Start_m": shot.get("Hole_Dist_Start_m", np.nan),
+                "Hole_Dist_End_m": shot.get("Hole_Dist_End_m", np.nan),
                 "Lie_Long": shot.get("Lie_Long", ""),
                 "Rating": shot.get("Rating", np.nan),
                 "Mental_Reaction": shot.get("Mental_Reaction", ""),
@@ -1380,7 +1195,7 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 1
                 st.rerun()
     elif step == 1:
-        distance_input(
+        shot["Start_Dist_m"] = distance_input(
             "Distanza iniziale dalla buca (metri)",
             "wz_short_start",
             0.0,
@@ -1389,7 +1204,6 @@ def wizard_short(session_name: str, user: str) -> None:
             [5, 10, 20, 30, 40],
         )
         if st.button("Conferma distanza", use_container_width=True):
-            shot["Start_Dist_m"] = read_distance("wz_short_start", 0.0)
             st.session_state["wz_step"] = 2
             st.rerun()
     elif step == 2:
@@ -1400,7 +1214,7 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 3
                 st.rerun()
     elif step == 3:
-        distance_input(
+        shot["End_Dist_m"] = distance_input(
             "Distanza finale dalla buca (metri)",
             "wz_short_end",
             0.0,
@@ -1409,7 +1223,6 @@ def wizard_short(session_name: str, user: str) -> None:
             [0, 1, 2, 4, 8],
         )
         if st.button("Conferma distanza finale", use_container_width=True):
-            shot["End_Dist_m"] = read_distance("wz_short_end", 0.0)
             st.session_state["wz_step"] = 4
             st.rerun()
     elif step == 4:
@@ -1435,7 +1248,7 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 7
                 st.rerun()
     elif step == 7:
-        distance_input(
+        lat = distance_input(
             "Metri a destra/sinistra dalla buca",
             "wz_short_lat",
             0.0,
@@ -1444,11 +1257,11 @@ def wizard_short(session_name: str, user: str) -> None:
             [0, 1, 2, 4, 8],
         )
         if st.button("Conferma errore laterale", use_container_width=True):
-            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], read_distance("wz_short_lat", 0.0))
+            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], lat)
             st.session_state["wz_step"] = 8
             st.rerun()
     elif step == 8:
-        distance_input(
+        depth_amt = distance_input(
             "Metri corto/lungo rispetto alla buca",
             "wz_short_depth",
             0.0,
@@ -1459,7 +1272,7 @@ def wizard_short(session_name: str, user: str) -> None:
         sense = st.radio("Senso", ["In linea", "Corto", "Lungo"])
         conv = {"In linea": "In linea col bersaglio", "Corto": "Corto del bersaglio", "Lungo": "Lungo del bersaglio"}
         if st.button("Conferma profondità", use_container_width=True):
-            shot["Proximity_Depth_m"] = depth_sign(read_distance("wz_short_depth", 0.0), conv[sense])
+            shot["Proximity_Depth_m"] = depth_sign(depth_amt, conv[sense])
             st.session_state["wz_step"] = 9
             st.rerun()
     elif step == 9:
@@ -1480,9 +1293,12 @@ def wizard_short(session_name: str, user: str) -> None:
     elif step == 11:
         st.markdown("#### Strokes gained (usa distanze e lie già inseriti)")
         if st.button("Calcola e salva colpo", type="primary", use_container_width=True):
-            start_m = float(shot.get("Start_Dist_m", read_distance("wz_short_start", 0.0)))
-            end_m = float(shot.get("End_Dist_m", read_distance("wz_short_end", 0.0)))
-            sg = compute_sg_short(start_m, end_m, str(shot["Lie_Start"]), str(shot["Lie_End"]))
+            sg = compute_sg_short(
+                float(shot["Start_Dist_m"]),
+                float(shot["End_Dist_m"]),
+                str(shot["Lie_Start"]),
+                str(shot["Lie_End"]),
+            )
             row = {
                 "User": user,
                 "Date": datetime.date.today(),
@@ -1498,10 +1314,10 @@ def wizard_short(session_name: str, user: str) -> None:
                 "Direction_LR": shot.get("Direction_LR", ""),
                 "Proximity_Lateral_m": shot.get("Proximity_Lateral_m", np.nan),
                 "Proximity_Depth_m": shot.get("Proximity_Depth_m", np.nan),
-                "Start_Dist_m": start_m,
-                "End_Dist_m": end_m,
-                "Hole_Dist_Start_m": start_m,
-                "Hole_Dist_End_m": end_m,
+                "Start_Dist_m": shot.get("Start_Dist_m", np.nan),
+                "End_Dist_m": shot.get("End_Dist_m", np.nan),
+                "Hole_Dist_Start_m": shot.get("Start_Dist_m", np.nan),
+                "Hole_Dist_End_m": shot.get("End_Dist_m", np.nan),
                 "Lie_Long": "",
                 "Rating": shot.get("Rating", np.nan),
                 "Mental_Reaction": shot.get("Mental_Reaction", ""),
@@ -1522,7 +1338,7 @@ def wizard_putt(session_name: str, user: str) -> None:
     shot: dict[str, Any] = st.session_state.setdefault("wz_payload", {})
 
     if step == 0:
-        distance_input(
+        shot["Start_Dist_m"] = distance_input(
             "Distanza iniziale dalla buca (metri)",
             "wz_putt_start",
             0.0,
@@ -1531,11 +1347,10 @@ def wizard_putt(session_name: str, user: str) -> None:
             [0.5, 1, 2, 4, 8],
         )
         if st.button("Avanti", use_container_width=True):
-            shot["Start_Dist_m"] = read_distance("wz_putt_start", 0.0)
             st.session_state["wz_step"] = 1
             st.rerun()
     elif step == 1:
-        distance_input(
+        shot["End_Dist_m"] = distance_input(
             "Distanza finale (0 se in buca)",
             "wz_putt_end",
             0.0,
@@ -1544,8 +1359,6 @@ def wizard_putt(session_name: str, user: str) -> None:
             [0, 0.3, 0.6, 1.0, 2.0],
         )
         if st.button("Conferma distanze", use_container_width=True):
-            shot["Start_Dist_m"] = read_distance("wz_putt_start", shot.get("Start_Dist_m", 0.0))
-            shot["End_Dist_m"] = read_distance("wz_putt_end", 0.0)
             st.session_state["wz_step"] = 2
             st.rerun()
     elif step == 2:
@@ -1581,9 +1394,7 @@ def wizard_putt(session_name: str, user: str) -> None:
     elif step == 6:
         st.markdown("#### Salva putt (strokes gained dal primo putt)")
         if st.button("Calcola SG e salva", type="primary", use_container_width=True):
-            start_m = float(shot.get("Start_Dist_m", read_distance("wz_putt_start", 0.0)))
-            end_m = float(shot.get("End_Dist_m", read_distance("wz_putt_end", 0.0)))
-            sg = compute_sg_putt(start_m, end_m)
+            sg = compute_sg_putt(float(shot["Start_Dist_m"]), float(shot["End_Dist_m"]))
             row = {
                 "User": user,
                 "Date": datetime.date.today(),
@@ -1599,10 +1410,10 @@ def wizard_putt(session_name: str, user: str) -> None:
                 "Direction_LR": "",
                 "Proximity_Lateral_m": np.nan,
                 "Proximity_Depth_m": np.nan,
-                "Start_Dist_m": start_m,
-                "End_Dist_m": end_m,
-                "Hole_Dist_Start_m": start_m,
-                "Hole_Dist_End_m": end_m,
+                "Start_Dist_m": shot.get("Start_Dist_m", np.nan),
+                "End_Dist_m": shot.get("End_Dist_m", np.nan),
+                "Hole_Dist_Start_m": shot.get("Start_Dist_m", np.nan),
+                "Hole_Dist_End_m": shot.get("End_Dist_m", np.nan),
                 "Lie_Long": "",
                 "Rating": shot.get("Rating", np.nan),
                 "Mental_Reaction": shot.get("Mental_Reaction", ""),
@@ -1829,7 +1640,7 @@ def main() -> None:
     )
     page = st.radio(
         "Scegli sezione",
-        ["Inserimento dati", "Review", "Diario di Gioco"],
+        ["Inserimento dati", "Review"],
         horizontal=True,
         key="main_page_home",
     )
@@ -1882,10 +1693,6 @@ def main() -> None:
                 wizard_putt(session_name, user)
             brand_footer()
 
-    elif page == "Diario di Gioco":
-        brand_header("Diario di Gioco")
-        diario_panel(user, session_name)
-
     else:
         brand_header()
         review_panel(user, session_name)
@@ -1894,4 +1701,3 @@ def main() -> None:
 if __name__ == "__main__":
     main()
     
-
