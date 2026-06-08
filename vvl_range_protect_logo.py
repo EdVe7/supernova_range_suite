@@ -1,7 +1,8 @@
 
+
 """
-Supernova Range Suite — tracking allenamento (range, gioco corto, putting).
-UI mobile-first, tema bianco/oro, persistenza Google Sheets. Nessun export PDF.
+Zanardelli Range Suite — tracking allenamento (range, gioco corto, putting).
+UI mobile-first, persistenza Google Sheets (stesse colonne e secrets dell'originale).
 """
 
 from __future__ import annotations
@@ -17,15 +18,17 @@ import plotly.graph_objects as go
 import streamlit as st
 
 try:
-    from streamlit_gsheets_connection import GSheetsConnection
+    from streamlit_gsheets import GSheetsConnection
 except ImportError:  # pragma: no cover
-    from streamlit_gsheets import GSheetsConnection  # type: ignore
+    from streamlit_gsheets_connection import GSheetsConnection  # type: ignore
 
 # =============================================================================
 # Config pagina
 # =============================================================================
+APP_NAME = "Zanardelli Range Suite"
+
 st.set_page_config(
-    page_title="Supernova Range Suite",
+    page_title=APP_NAME,
     page_icon="⛳",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -39,15 +42,17 @@ st.markdown(f"""
     .stApp {{background: linear-gradient(180deg, #FFFFFF 0%, #FFFBEF 75%, #F8EFCF 100%);}}
     </style>
     """, unsafe_allow_html=True)
+    
 
-
-GOLD = "#C9A227"
+BLACK = "#141414"
+BLACK_SOFT = "#2A2A2A"
+GOLD = "#C9A227"       # ocra
 GOLD_LIGHT = "#E8D48A"
 GOLD_DARK = "#7A5B12"
 WHITE = "#FFFFFF"
-OFF_WHITE = "#FFF9F2"
-TEXT = "#403022"
-MUTED = "#8A6F55"
+OFF_WHITE = "#FFFCF7"
+TEXT = "#1A1A1A"
+MUTED = "#6B5B4A"
 ACCENT_BLUE = "#5A8DEE"
 ACCENT_BLUE_SOFT = "#EEF4FF"
 SUCCESS_GREEN = "#17A673"
@@ -165,31 +170,31 @@ def inject_styles() -> None:
     st.markdown(
         f"""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Manrope:wght@600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Sans:wght@600;700&display=swap');
     #MainMenu {{visibility: hidden; height: 0;}}
     footer {{visibility: hidden; height: 0;}}
     header [data-testid="stHeader"] {{background: transparent;}}
     html, body, [class*="css"] {{
-        font-family: 'Inter', sans-serif;
+        font-family: 'Source Sans 3', 'Segoe UI', sans-serif;
         color: {TEXT};
     }}
     .stApp {{
         background:
-            radial-gradient(circle at 85% 8%, #ffe2c4 0%, rgba(255,226,196,0.0) 30%),
-            radial-gradient(circle at 10% -5%, #f7ebc8 0%, rgba(247,235,200,0.0) 32%),
-            linear-gradient(180deg, #fff6ed 0%, #ffffff 52%);
+            radial-gradient(ellipse 90% 40% at 100% 0%, {ORANGE_SOFT} 0%, transparent 55%),
+            radial-gradient(ellipse 70% 35% at 0% 0%, {GOLD_LIGHT}33 0%, transparent 50%),
+            linear-gradient(180deg, {OFF_WHITE} 0%, {WHITE} 45%, #FAF6EF 100%);
         color: {TEXT};
     }}
     .block-container {{
-        padding-top: 0.75rem;
-        padding-bottom: 4rem;
-        max-width: 860px;
+        padding-top: 0.6rem;
+        padding-bottom: 4.5rem;
+        max-width: 920px;
     }}
     h1, h2, h3 {{
-        color: {TEXT};
-        font-family: 'Manrope', sans-serif;
-        font-weight: 800;
-        letter-spacing: -0.01em;
+        color: {BLACK};
+        font-family: 'IBM Plex Sans', sans-serif;
+        font-weight: 700;
+        letter-spacing: -0.02em;
     }}
     h3 {{
         margin-top: 0.25rem;
@@ -217,10 +222,12 @@ def inject_styles() -> None:
     div[data-baseweb="select"] > div,
     .stTextInput input,
     .stNumberInput input {{
-        border-radius: 12px !important;
-        border: 1px solid #d9dee8 !important;
+        border-radius: 10px !important;
+        border: 1.5px solid #D4C4B0 !important;
         background: #fff !important;
-        min-height: 2.7rem !important;
+        min-height: 3.1rem !important;
+        font-size: 1.05rem !important;
+        box-shadow: inset 0 1px 2px rgba(20,20,20,0.05) !important;
     }}
     .stTextInput input:focus,
     .stNumberInput input:focus {{
@@ -243,20 +250,22 @@ def inject_styles() -> None:
         font-family: 'Manrope', sans-serif !important;
         font-weight: 800 !important;
     }}
-    div[data-testid="stHorizontalBlock"] button {{
-        min-height: 3.15rem !important;
-        font-size: 1rem !important;
-        border-radius: 14px !important;
-        border: 1px solid #d7ddeb !important;
-        background: {WHITE} !important;
-        color: {TEXT} !important;
+    div[data-testid="stHorizontalBlock"] > div .stButton > button {{
+        min-height: 4rem !important;
+        font-size: 1.08rem !important;
+        border-radius: 12px !important;
+        border: 1.5px solid #D8D0C4 !important;
+        background: linear-gradient(180deg, {WHITE} 0%, #FAF8F4 100%) !important;
+        color: {BLACK} !important;
         font-weight: 700 !important;
-        transition: all .14s ease-in-out !important;
+        box-shadow: 0 2px 0 #E8E0D4, 0 6px 16px rgba(20,20,20,0.07) !important;
+        transition: transform 0.12s ease, box-shadow 0.12s ease !important;
     }}
-    div[data-testid="stHorizontalBlock"] button:hover {{
+    div[data-testid="stHorizontalBlock"] > div .stButton > button:hover {{
         border-color: {ORANGE} !important;
-        box-shadow: 0 8px 16px rgba(240,138,36,0.2) !important;
-        transform: translateY(-1px);
+        color: #D96E0A !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 0 #E8E0D4, 0 10px 22px rgba(240,138,36,0.22) !important;
     }}
     .sn-big-btn > button {{
         width: 100%;
@@ -268,12 +277,13 @@ def inject_styles() -> None:
         font-weight: 700;
     }}
     .stButton > button[kind="primary"], .stDownloadButton > button {{
-        border-radius: 14px !important;
+        min-height: 3.5rem !important;
+        border-radius: 12px !important;
         border: 0 !important;
         color: #fff !important;
         font-weight: 700 !important;
-        background: linear-gradient(135deg, {ORANGE}, #f4aa4f) !important;
-        box-shadow: 0 8px 18px rgba(240,138,36,0.3) !important;
+        background: linear-gradient(180deg, {ORANGE} 0%, #D96E0A 100%) !important;
+        box-shadow: 0 3px 0 {GOLD_DARK}, 0 10px 24px rgba(240,138,36,0.32) !important;
     }}
     .stButton > button[kind="primary"]:hover, .stDownloadButton > button:hover {{
         filter: brightness(1.04);
@@ -327,12 +337,13 @@ def inject_styles() -> None:
         padding-top: 1rem;
     }}
     .sn-hero {{
-        background: linear-gradient(122deg, #ffffff, {ORANGE_LIGHT});
-        border: 1px solid {CARD_BORDER};
-        border-radius: 18px;
-        padding: 14px 16px;
+        background: linear-gradient(135deg, {WHITE} 0%, {ORANGE_LIGHT} 100%);
+        border: 1.5px solid {CARD_BORDER};
+        border-left: 5px solid {ORANGE};
+        border-radius: 14px;
+        padding: 16px 18px;
         margin: 8px 0 16px 0;
-        box-shadow: 0 12px 24px rgba(240, 138, 36, 0.12);
+        box-shadow: 0 8px 24px rgba(20,20,20,0.08);
     }}
     .sn-hero-title {{
         font-size: 1.08rem;
@@ -347,23 +358,31 @@ def inject_styles() -> None:
     }}
     .sn-chip {{
         display: inline-block;
-        background: {ORANGE_SOFT};
-        border: 1px solid #f6c998;
-        border-radius: 999px;
-        padding: 4px 10px;
+        background: {BLACK};
+        color: {WHITE};
+        border-radius: 6px;
+        padding: 5px 11px;
         margin-right: 6px;
-        margin-top: 6px;
-        color: #a85a11;
-        font-size: 0.8rem;
+        margin-top: 8px;
+        font-size: 0.78rem;
         font-weight: 700;
+    }}
+    .sn-chip-alt {{
+        background: {GOLD};
+        color: {BLACK};
     }}
     .sn-panel {{
         background: {CARD_BG};
-        border: 1px solid {CARD_BORDER};
-        border-radius: 16px;
-        padding: 12px 14px;
-        margin-bottom: 12px;
-        box-shadow: 0 8px 18px rgba(240, 138, 36, 0.1);
+        border: 1.5px solid {CARD_BORDER};
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 14px;
+        box-shadow: 0 6px 20px rgba(20,20,20,0.06);
+    }}
+    .zrs-preset .stButton > button {{
+        min-height: 3.3rem !important;
+        background: {ORANGE_LIGHT} !important;
+        border-color: #F0C89A !important;
     }}
     .sn-panel-title {{
         font-family: 'Manrope', sans-serif;
@@ -390,7 +409,7 @@ def brand_header(title: str | None = None) -> None:
             st.image("logo.png", use_container_width=True)
         except Exception:
             st.markdown(
-                f"<div style='font-size:1.6rem;font-weight:800;color:{GOLD};'>SUPERNOVA</div>",
+                f"<div style='font-size:1.6rem;font-weight:800;color:{GOLD};'>{APP_NAME}</div>",
                 unsafe_allow_html=True,
             )
     with c2:
@@ -404,7 +423,12 @@ def brand_header(title: str | None = None) -> None:
 
 def brand_footer() -> None:
     st.markdown(
-        "<div class='sn-footer'>Powered by Supernova Sport Science</div>",
+        (
+            "<div class='sn-footer'>"
+            f"<strong>© {datetime.date.today().year} Andrea Zanardelli</strong><br>"
+            "Co-designed by Andrea Zanardelli and Edoardo Venturoli"
+            "</div>"
+        ),
         unsafe_allow_html=True,
     )
 
@@ -412,7 +436,9 @@ def brand_footer() -> None:
 def render_hero(title: str, subtitle: str, chips: list[str] | None = None) -> None:
     chips_html = ""
     if chips:
-        chips_html = "".join([f"<span class='sn-chip'>{c}</span>" for c in chips])
+        for i, c in enumerate(chips):
+            cls = "sn-chip sn-chip-alt" if i % 2 else "sn-chip"
+            chips_html += f"<span class='{cls}'>{c}</span>"
     st.markdown(
         (
             "<div class='sn-hero'>"
@@ -441,13 +467,21 @@ def render_command_header(page: str) -> None:
     st.markdown(
         (
             "<div class='sn-panel'>"
-            "<div class='sn-panel-title'>Supernova Coach Command Center</div>"
+            f"<div class='sn-panel-title'>{APP_NAME} — Command Center</div>"
             f"<p class='sn-panel-sub'>Sezione attiva: <b>{page}</b> · "
             "UI ottimizzata per lettura rapida coach-atleta in campo.</p>"
             "</div>"
         ),
         unsafe_allow_html=True,
     )
+
+
+def _set_distance(key: str, value: float) -> None:
+    st.session_state[key] = float(value)
+
+
+def read_distance(key: str, default: float = 0.0) -> float:
+    return float(st.session_state.get(key, default))
 
 
 def distance_input(
@@ -457,24 +491,31 @@ def distance_input(
     max_value: float,
     step: float,
     presets: list[float] | None = None,
-) -> float:
+) -> None:
+    if key not in st.session_state:
+        st.session_state[key] = float(min_value)
     st.markdown(f"**{label}**")
-    value = st.number_input(
+    st.number_input(
         "metri",
-        min_value=min_value,
-        max_value=max_value,
-        step=step,
+        min_value=float(min_value),
+        max_value=float(max_value),
+        step=float(step),
         key=key,
         label_visibility="collapsed",
     )
     if presets:
-        st.caption("Preset rapidi")
-        cols = st.columns(min(len(presets), 5))
-        for i, p in enumerate(presets[:5]):
-            if cols[i].button(f"{p:g} m", key=f"{key}_p{i}", use_container_width=True):
-                st.session_state[key] = float(p)
-                st.rerun()
-    return float(st.session_state.get(key, value))
+        st.caption("Preset rapidi — tap per applicare")
+        st.markdown('<div class="zrs-preset">', unsafe_allow_html=True)
+        cols = st.columns(min(len(presets), 6))
+        for i, p in enumerate(presets[:6]):
+            cols[i].button(
+                f"{p:g} m",
+                key=f"{key}_p{i}",
+                use_container_width=True,
+                on_click=_set_distance,
+                args=(key, float(p)),
+            )
+        st.markdown("</div>", unsafe_allow_html=True)
 
 
 # =============================================================================
@@ -683,11 +724,13 @@ def run_post_auth_logo() -> None:
                 st.image("logo.png", use_container_width=True)
             except Exception:
                 st.markdown(
-                    f"<h1 style='text-align:center;color:{GOLD};'>SUPERNOVA</h1>",
+                    f"<h1 style='text-align:center;color:{GOLD};'>{APP_NAME}</h1>",
                     unsafe_allow_html=True,
                 )
     time.sleep(2.0)
     holder.empty()
+
+
 # =============================================================================
 # Helpers UI wizard
 # =============================================================================
@@ -1043,9 +1086,9 @@ def wizard_range(session_name: str, user: str) -> None:
 
     if step == 0:
         st.markdown("#### Bastone")
-        cols = st.columns(3)
+        cols = st.columns(4)
         for i, cl in enumerate(CLUBS_LONG):
-            if cols[i % 3].button(cl, key=f"cl{i}"):
+            if cols[i % 4].button(cl, key=f"cl{i}"):
                 shot["Club"] = cl
                 st.session_state["wz_step"] = 1
                 st.rerun()
@@ -1073,7 +1116,7 @@ def wizard_range(session_name: str, user: str) -> None:
                 st.rerun()
     elif step == 4:
         st.markdown("#### Errore laterale (metri assoluti)")
-        lat = distance_input(
+        distance_input(
             "Metri a destra/sinistra dal punto mirato",
             "wz_range_lat",
             0.0,
@@ -1081,13 +1124,13 @@ def wizard_range(session_name: str, user: str) -> None:
             0.5,
             [0, 2, 5, 10, 20],
         )
-        if st.button("Conferma errore laterale", use_container_width=True):
-            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], lat)
+        if st.button("Conferma errore laterale", type="primary", use_container_width=True):
+            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], read_distance("wz_range_lat", 0.0))
             st.session_state["wz_step"] = 5
             st.rerun()
     elif step == 5:
         st.markdown("#### Errore in profondità (per mappa dall’alto)")
-        depth_amt = distance_input(
+        distance_input(
             "Quanti metri corto/lungo?",
             "wz_range_depth",
             0.0,
@@ -1095,9 +1138,13 @@ def wizard_range(session_name: str, user: str) -> None:
             0.5,
             [0, 2, 5, 10, 20],
         )
-        sense = st.radio("Senso", ["In linea col bersaglio", "Corto del bersaglio", "Lungo del bersaglio"])
-        if st.button("Conferma profondità", use_container_width=True):
-            shot["Proximity_Depth_m"] = depth_sign(depth_amt, sense)
+        sense = st.radio(
+            "Senso",
+            ["In linea col bersaglio", "Corto del bersaglio", "Lungo del bersaglio"],
+            horizontal=True,
+        )
+        if st.button("Conferma profondità", type="primary", use_container_width=True):
+            shot["Proximity_Depth_m"] = depth_sign(read_distance("wz_range_depth", 0.0), sense)
             st.session_state["wz_step"] = 6
             st.rerun()
     elif step == 6:
@@ -1110,42 +1157,40 @@ def wizard_range(session_name: str, user: str) -> None:
                 st.rerun()
     elif step == 7:
         st.markdown("#### Reazione mentale")
-        for opt in MENTAL_OPTIONS:
-            if st.button(opt, key=f"mn{opt}", use_container_width=True):
+        cols = st.columns(2)
+        for i, opt in enumerate(MENTAL_OPTIONS):
+            if cols[i % 2].button(opt, key=f"mn{opt}", use_container_width=True):
                 shot["Mental_Reaction"] = opt
                 st.session_state["wz_step"] = 8
                 st.rerun()
     elif step == 8:
         st.markdown("#### Dati per Strokes Gained — gioco lungo")
-        shot["Lie_Long"] = st.radio("Lie di partenza", ["Tee", "Fairway"])
-        shot["Hole_Dist_Start_m"] = distance_input(
+        shot["Lie_Long"] = st.radio("Lie di partenza", ["Tee", "Fairway"], horizontal=True)
+        distance_input(
             "Distanza dalla buca prima del colpo (metri)",
             "wz_range_hole_start",
             0.0,
             550.0,
             1.0,
-            [40, 80, 120, 160, 200],
+            [40, 80, 120, 160, 200, 250],
         )
-        shot["Hole_Dist_End_m"] = distance_input(
+        distance_input(
             "Distanza dalla buca dopo il colpo (metri)",
             "wz_range_hole_end",
             0.0,
             550.0,
             1.0,
-            [0, 10, 30, 60, 100],
+            [0, 10, 30, 60, 100, 150],
         )
         lie_after = st.selectbox(
             "Lie dopo il colpo (per il modello)",
             ["Fairway", "First cut", "Semi-rough", "Rough", "Bunker", "Fringe", "Green"],
         )
         if st.button("Calcola e salva colpo", type="primary", use_container_width=True):
+            hole_start = read_distance("wz_range_hole_start", 0.0)
+            hole_end = read_distance("wz_range_hole_end", 0.0)
             from_tee = shot["Lie_Long"] == "Tee"
-            sg = compute_sg_long(
-                float(shot["Hole_Dist_Start_m"]),
-                float(shot["Hole_Dist_End_m"]),
-                from_tee,
-                lie_after,
-            )
+            sg = compute_sg_long(hole_start, hole_end, from_tee, lie_after)
             row = {
                 "User": user,
                 "Date": datetime.date.today(),
@@ -1161,10 +1206,10 @@ def wizard_range(session_name: str, user: str) -> None:
                 "Direction_LR": shot.get("Direction_LR", ""),
                 "Proximity_Lateral_m": shot.get("Proximity_Lateral_m", np.nan),
                 "Proximity_Depth_m": shot.get("Proximity_Depth_m", np.nan),
-                "Start_Dist_m": shot.get("Hole_Dist_Start_m", np.nan),
-                "End_Dist_m": shot.get("Hole_Dist_End_m", np.nan),
-                "Hole_Dist_Start_m": shot.get("Hole_Dist_Start_m", np.nan),
-                "Hole_Dist_End_m": shot.get("Hole_Dist_End_m", np.nan),
+                "Start_Dist_m": hole_start,
+                "End_Dist_m": hole_end,
+                "Hole_Dist_Start_m": hole_start,
+                "Hole_Dist_End_m": hole_end,
                 "Lie_Long": shot.get("Lie_Long", ""),
                 "Rating": shot.get("Rating", np.nan),
                 "Mental_Reaction": shot.get("Mental_Reaction", ""),
@@ -1193,15 +1238,16 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 1
                 st.rerun()
     elif step == 1:
-        shot["Start_Dist_m"] = distance_input(
+        distance_input(
             "Distanza iniziale dalla buca (metri)",
             "wz_short_start",
             0.0,
             50.0,
             0.5,
-            [5, 10, 20, 30, 40],
+            [5, 10, 15, 20, 30, 40],
         )
-        if st.button("Conferma distanza", use_container_width=True):
+        if st.button("Conferma distanza", type="primary", use_container_width=True):
+            shot["Start_Dist_m"] = read_distance("wz_short_start", 0.0)
             st.session_state["wz_step"] = 2
             st.rerun()
     elif step == 2:
@@ -1212,15 +1258,16 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 3
                 st.rerun()
     elif step == 3:
-        shot["End_Dist_m"] = distance_input(
+        distance_input(
             "Distanza finale dalla buca (metri)",
             "wz_short_end",
             0.0,
             80.0,
             0.5,
-            [0, 1, 2, 4, 8],
+            [0, 1, 2, 4, 8, 15],
         )
-        if st.button("Conferma distanza finale", use_container_width=True):
+        if st.button("Conferma distanza finale", type="primary", use_container_width=True):
+            shot["End_Dist_m"] = read_distance("wz_short_end", 0.0)
             st.session_state["wz_step"] = 4
             st.rerun()
     elif step == 4:
@@ -1246,7 +1293,7 @@ def wizard_short(session_name: str, user: str) -> None:
                 st.session_state["wz_step"] = 7
                 st.rerun()
     elif step == 7:
-        lat = distance_input(
+        distance_input(
             "Metri a destra/sinistra dalla buca",
             "wz_short_lat",
             0.0,
@@ -1254,12 +1301,12 @@ def wizard_short(session_name: str, user: str) -> None:
             0.5,
             [0, 1, 2, 4, 8],
         )
-        if st.button("Conferma errore laterale", use_container_width=True):
-            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], lat)
+        if st.button("Conferma errore laterale", type="primary", use_container_width=True):
+            shot["Proximity_Lateral_m"] = lat_sign(shot["Direction_LR"], read_distance("wz_short_lat", 0.0))
             st.session_state["wz_step"] = 8
             st.rerun()
     elif step == 8:
-        depth_amt = distance_input(
+        distance_input(
             "Metri corto/lungo rispetto alla buca",
             "wz_short_depth",
             0.0,
@@ -1267,10 +1314,10 @@ def wizard_short(session_name: str, user: str) -> None:
             0.5,
             [0, 1, 2, 4, 8],
         )
-        sense = st.radio("Senso", ["In linea", "Corto", "Lungo"])
+        sense = st.radio("Senso", ["In linea", "Corto", "Lungo"], horizontal=True)
         conv = {"In linea": "In linea col bersaglio", "Corto": "Corto del bersaglio", "Lungo": "Lungo del bersaglio"}
-        if st.button("Conferma profondità", use_container_width=True):
-            shot["Proximity_Depth_m"] = depth_sign(depth_amt, conv[sense])
+        if st.button("Conferma profondità", type="primary", use_container_width=True):
+            shot["Proximity_Depth_m"] = depth_sign(read_distance("wz_short_depth", 0.0), conv[sense])
             st.session_state["wz_step"] = 9
             st.rerun()
     elif step == 9:
@@ -1291,12 +1338,9 @@ def wizard_short(session_name: str, user: str) -> None:
     elif step == 11:
         st.markdown("#### Strokes gained (usa distanze e lie già inseriti)")
         if st.button("Calcola e salva colpo", type="primary", use_container_width=True):
-            sg = compute_sg_short(
-                float(shot["Start_Dist_m"]),
-                float(shot["End_Dist_m"]),
-                str(shot["Lie_Start"]),
-                str(shot["Lie_End"]),
-            )
+            start_m = float(shot.get("Start_Dist_m", read_distance("wz_short_start", 0.0)))
+            end_m = float(shot.get("End_Dist_m", read_distance("wz_short_end", 0.0)))
+            sg = compute_sg_short(start_m, end_m, str(shot["Lie_Start"]), str(shot["Lie_End"]))
             row = {
                 "User": user,
                 "Date": datetime.date.today(),
@@ -1312,10 +1356,10 @@ def wizard_short(session_name: str, user: str) -> None:
                 "Direction_LR": shot.get("Direction_LR", ""),
                 "Proximity_Lateral_m": shot.get("Proximity_Lateral_m", np.nan),
                 "Proximity_Depth_m": shot.get("Proximity_Depth_m", np.nan),
-                "Start_Dist_m": shot.get("Start_Dist_m", np.nan),
-                "End_Dist_m": shot.get("End_Dist_m", np.nan),
-                "Hole_Dist_Start_m": shot.get("Start_Dist_m", np.nan),
-                "Hole_Dist_End_m": shot.get("End_Dist_m", np.nan),
+                "Start_Dist_m": start_m,
+                "End_Dist_m": end_m,
+                "Hole_Dist_Start_m": start_m,
+                "Hole_Dist_End_m": end_m,
                 "Lie_Long": "",
                 "Rating": shot.get("Rating", np.nan),
                 "Mental_Reaction": shot.get("Mental_Reaction", ""),
@@ -1336,19 +1380,20 @@ def wizard_putt(session_name: str, user: str) -> None:
     shot: dict[str, Any] = st.session_state.setdefault("wz_payload", {})
 
     if step == 0:
-        shot["Start_Dist_m"] = distance_input(
+        distance_input(
             "Distanza iniziale dalla buca (metri)",
             "wz_putt_start",
             0.0,
             60.0,
             0.1,
-            [0.5, 1, 2, 4, 8],
+            [0.5, 1, 2, 3, 4, 8],
         )
-        if st.button("Avanti", use_container_width=True):
+        if st.button("Avanti", type="primary", use_container_width=True):
+            shot["Start_Dist_m"] = read_distance("wz_putt_start", 0.0)
             st.session_state["wz_step"] = 1
             st.rerun()
     elif step == 1:
-        shot["End_Dist_m"] = distance_input(
+        distance_input(
             "Distanza finale (0 se in buca)",
             "wz_putt_end",
             0.0,
@@ -1356,7 +1401,9 @@ def wizard_putt(session_name: str, user: str) -> None:
             0.05,
             [0, 0.3, 0.6, 1.0, 2.0],
         )
-        if st.button("Conferma distanze", use_container_width=True):
+        if st.button("Conferma distanze", type="primary", use_container_width=True):
+            shot["Start_Dist_m"] = read_distance("wz_putt_start", shot.get("Start_Dist_m", 0.0))
+            shot["End_Dist_m"] = read_distance("wz_putt_end", 0.0)
             st.session_state["wz_step"] = 2
             st.rerun()
     elif step == 2:
@@ -1492,6 +1539,7 @@ def review_panel(user: str, session_name: str) -> None:
     )
     st.caption("Dettaglio colpo per colpo (settore selezionato).")
     st.dataframe(shots_table, use_container_width=True, hide_index=True)
+
     avg_by_cat = (
         df_f.groupby("Category", dropna=False)
         .agg(
@@ -1506,6 +1554,7 @@ def review_panel(user: str, session_name: str) -> None:
     avg_by_cat["Media_SG"] = pd.to_numeric(avg_by_cat["Media_SG"], errors="coerce").round(3)
     st.caption("Medie per area (periodo selezionato).")
     st.dataframe(avg_by_cat, use_container_width=True, hide_index=True)
+
     avg_by_club = (
         dsec.groupby("Club", dropna=False)
         .agg(
@@ -1520,6 +1569,7 @@ def review_panel(user: str, session_name: str) -> None:
     avg_by_club["Media_SG"] = pd.to_numeric(avg_by_club["Media_SG"], errors="coerce").round(3)
     st.caption("Medie per colpo/bastone nel settore selezionato.")
     st.dataframe(avg_by_club, use_container_width=True, hide_index=True)
+
     no_short = df_f[df_f["Category"] != "SHORT"]
     comp_avg = pd.DataFrame(
         [
@@ -1541,6 +1591,7 @@ def review_panel(user: str, session_name: str) -> None:
     comp_avg["Media SG"] = pd.to_numeric(comp_avg["Media SG"], errors="coerce").round(3)
     st.caption("Confronto medie SG inclusi / non inclusi.")
     st.dataframe(comp_avg, use_container_width=True, hide_index=True)
+
     sg_summary_table(df_f, sector)
     trend_panel(dsec, CATEGORIES[sector])
     club_breakdown_table(dsec)
@@ -1625,27 +1676,6 @@ def main() -> None:
         st.session_state["post_auth_logo_pending"] = False
         st.rerun()
 
-    with st.sidebar:
-        brand_header("Profilo")
-        render_panel(
-            "Navigazione",
-            "Passa tra raccolta dati e review analytics. La scelta e' sempre disponibile qui.",
-        )
-        st.write(f"**Atleta:** {user}")
-        st.markdown("### Sezione")
-        page = st.selectbox(
-            "Apri sezione",
-            ["Inserimento dati", "Review"],
-            index=0,
-            key="main_page_sidebar",
-            label_visibility="collapsed",
-        )
-        session_name = st.text_input("Nome sessione / note", value="Sessione Allenamento")
-        st.divider()
-        render_panel(
-            "Sessione attiva",
-            "Il nome sessione viene usato nel filtro 'Sessione corrente' in Review.",
-        )
     brand_header("Profilo")
     st.write(f"**Atleta:** {user}")
     session_name = st.text_input(
@@ -1673,7 +1703,7 @@ def main() -> None:
         brand_header("Inserimento rapido")
         render_hero(
             "Sessione di raccolta dati",
-            "Input veloce a step singoli con pulsanti grandi, pensato per utilizzo smartphone sul campo pratica.",
+            "Input rapido con pulsanti grandi e preset distanza affidabili — ottimizzato per smartphone sul campo.",
             ["Range", "Short game", "Putting"],
         )
         st.session_state.setdefault("wz_cat", None)
